@@ -10,7 +10,7 @@ const hint = document.getElementById("hint");
 let lastCount = 0, busy = false;
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function cssName(m){return m.role==="human"?"human":m.role==="system"?"system":({Gemini:"gemini",Llama:"llama",Mistral:"mistral"}[m.name]||"system");}
+function cssName(m){return m.role==="human"?"human":m.role==="system"?"system":({Gemini:"gemini",Qwen:"qwen",Mistral:"mistral"}[m.name]||"system");}
 function render(messages){
   if(!messages.length)return;
   if(messages.length===lastCount)return;
