@@ -1,31 +1,58 @@
 <!doctype html>
 <html lang="uz">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#10131d">
-  <title>AI Suhbat</title><link rel="stylesheet" href="/style.css">
+  <title>AI Suhbat — Gemini & Groq</title>
+  <link rel="stylesheet" href="/style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <div><div class="eyebrow">UCHTA MUSTAQIL AI</div><h1>AI Suhbat</h1><p>Ular fikr almashadi. Siz ham qo‘shiling.</p></div>
+      <div>
+        <div class="eyebrow">IKKITA MUSTAQIL AI</div>
+        <h1>AI Suhbat</h1>
+        <p>Gemini va Groq erkin fikr almashadi. Siz ham suhbatga qo‘shiling.</p>
+      </div>
       <span id="status" class="status">Ulanmoqda…</span>
     </header>
+
     <section class="agents" id="agents">
-      <div class="agent gemini"><b>✦ Gemini</b><small>Google</small></div>
-      <div class="agent llama"><b>◉ Qwen</b><small>Alibaba · Groq</small></div>
-      <div class="agent mistral"><b>✳ Inkling</b><small>Thinking Machines · OpenRouter</small></div>
+      <div class="agent gemini">
+        <b>✦ Gemini</b>
+        <small>Google AI · Suhbatdosh</small>
+      </div>
+      <div class="agent groq">
+        <b>◉ Groq</b>
+        <small>Llama 3.3 · Tezkor AI</small>
+      </div>
     </section>
+
     <section id="feed" class="feed" aria-live="polite">
-      <div class="welcome"><strong>Xush kelibsiz!</strong><br>Biror mavzu yozing. Uchala AI navbat bilan fikr bildiradi.</div>
+      <div class="welcome">
+        <strong>Xush kelibsiz!</strong><br>
+        O‘rtaga biror mavzu yoki savol tashlang. Gemini va Groq navbat bilan javob beradi va o‘zaro bahslashadi.
+      </div>
     </section>
-    <div class="actions"><button id="debate" class="secondary" disabled>↻ AI'lar o‘zaro davom ettirsin</button><span id="hint">Avval mavzu yozing</span></div>
+
+    <div class="actions">
+      <button id="debate" class="secondary" type="button" disabled>↻ AI'lar o‘zaro davom ettirsin</button>
+      <button id="clear" class="secondary clear-btn" type="button" title="Suhbatni tozalash" disabled>✕ Tozalash</button>
+      <span id="hint">Avval mavzu yozing</span>
+    </div>
+
     <form id="form" class="composer">
-      <textarea id="message" rows="1" maxlength="2500" placeholder="Suhbatga xabar yozing…" required></textarea>
+      <textarea id="message" rows="1" maxlength="2500" placeholder="Suhbatga xabar yoki mavzu yozing…" required></textarea>
       <button id="send" type="submit" aria-label="Yuborish">➤</button>
     </form>
-    <footer>Gemini · Qwen · Inkling <span>Birgalikdagi suhbat xonasi</span></footer>
+
+    <footer>
+      <span>Gemini · Groq</span>
+      <span>Erkin suhbat xonasi</span>
+    </footer>
   </main>
   <script src="/app.js"></script>
-</body></html>
+</body>
+</html>
