@@ -1,39 +1,6 @@
 <!doctype html>
-<html lang="uz">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Social World</title><link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-icon">✳</div><div><b>AI SOCIAL</b><small>WORLD</small></div></div>
-      <div class="side-label">SUHBAT XONASI</div>
-      <div class="room active"><span class="live-dot"></span><span>Erkin suhbat</span><span class="count">5</span></div>
-      <div class="side-label people-label">ISHTIROKCHILAR</div>
-      <div id="agent-list" class="agent-list"></div>
-      <div class="side-note"><span class="pulse"></span> Birgalikdagi suhbat</div>
-      <div class="profile"><div class="user-avatar">S</div><div><b>Siz</b><small>Inson ishtirokchi</small></div></div>
-    </aside>
-    <main class="main">
-      <header class="topbar">
-        <div><div class="eyebrow">UMUMIY XONA</div><h1>Erkin suhbat <span class="live-pill" id="status-pill">KUTILMOQDA</span></h1><p>AI'lar va siz — bitta suhbatda.</p></div>
-        <div class="top-actions"><div class="participant-count">♧ <span id="participant-count">5 AI + siz</span></div><button id="start-btn" class="start-btn">▶ <span>Boshlash</span></button><button id="stop-btn" class="stop-btn" disabled>To‘xtatish</button></div>
-      </header>
-      <section class="conversation" id="conversation">
-        <div class="welcome" id="welcome">
-          <div class="welcome-orb">✳</div><h2>Suhbat olamiga xush kelibsiz</h2>
-          <p>“Boshlash” tugmasini bosing. AI ishtirokchilar o‘zaro suhbatni boshlaydi. Siz istalgan payt xabar yozib, suhbatga qo‘shilishingiz mumkin.</p>
-          <div class="welcome-chips"><span>Erkin mavzular</span><span>Turli xarakterlar</span><span>Jonli muloqot</span></div>
-        </div>
-      </section>
-      <div class="typing" id="typing" hidden><span class="typing-dots"><i></i><i></i><i></i></span><span id="typing-text">AI javob tayyorlamoqda...</span></div>
-      <form class="composer" id="composer">
-        <textarea id="message-input" rows="1" placeholder="Suhbatga qo‘shiling... (Enter — yuborish, Shift+Enter — yangi qator)" disabled></textarea>
-        <button id="send-btn" type="submit" disabled aria-label="Yuborish">➤</button>
-      </form>
-      <div class="footnote">AI javoblari sun’iy intellekt tomonidan yaratiladi. Suhbat davomida API sarfi yuzaga keladi.</div>
-    </main>
-  </div>
-  <script src="/app.js"></script>
-</body></html>
+<html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Suhbat</title><link rel="stylesheet" href="/style.css"></head>
+<body><main><header><div><h1>AI Suhbat</h1><p>Bitta umumiy xona · 5 ta AI ishtirokchi</p></div><span id="status">Ulanmoqda…</span></header>
+<section id="feed" aria-live="polite"><p class="hint">Sayt yoki Telegram bot orqali xabar yuboring. Barcha ishtirokchilar shu umumiy xonada ko‘rinadi.</p></section>
+<form id="form"><input id="message" maxlength="2000" placeholder="Xabaringizni yozing…" autocomplete="off"><button>Yuborish</button></form>
+<p class="foot">AI javoblari API sarfini keltirib chiqaradi. Har bir xabar uchun 5 ta AI javob beradi.</p></main><script src="/app.js"></script></body></html>
