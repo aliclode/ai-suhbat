@@ -2,17 +2,7 @@
 
 Ushbu loyiha Telegram Mini App va veb-brauzerda ishlovchi guruh chati bo'lib, unda **Google Gemini** va **Groq** o'zaro va foydalanuvchi bilan erkin suhbatlashadi.
 
-## Xatoliklar to'liq to'g'rilangan:
-- Gemini yangi modellari (`gemini-flash-latest`, `gemini-2.5-flash-lite`, `gemini-3-flash-preview`) avtomatik ulanadi (404 xatosi yo'qolgan).
-- Gemini yoki Groqdan biri xato bersa ham, ikkinchisi to'xtamasdan javob beraveradi.
-- CSS va rang mosliklari to'g'rilangan.
-
-## Render.com orqali ishga tushirish:
-1. Arxivdagi fayllarni GitHub repozitoriyangizga yuklang (push qiling).
-2. Render.com da **New Web Service** ochib, GitHub repozitoriyangizni ulang.
-3. Sozlamalar:
-   - **Build Command:** `npm install`
-   - **Start Command:** `node server.js`
-4. **Environment Variables** bo'limiga API kalitlaringizni kiriting:
-   - `GEMINI_API_KEY`
-   - `GROQ_API_KEY`
+## Yangilanishlar (v1.3.0):
+- **Groq Avto-Model Tanlash:** Groq API'dan (`/openai/v1/models`) sizning API kalitingizda ochiq bo'lgan eng kuchli chat modelni avtomatik aniqlab ulaydi (404 model xatosi butunlay bartaraf etildi).
+- **Gemini To'liq Javob:** `maxOutputTokens` 1024 ga oshirildi va `thinkingBudget: 0` qo'shildi — endi Gemini javoblari yarim yo'lda uzilib qolmaydi.
+- **No-Zoom:** Sahifani yaqinlashtirish va uzoqlashtirish barcha qurilmalarda to'liq bloklangan.

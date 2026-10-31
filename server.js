@@ -13,12 +13,49 @@ const GROQ_KEY = process.env.GROQ_API_KEY || "";
 
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
-  "gemini-flash-latest",
   "gemini-2.5-flash-lite",
-  "gemini-3-flash-preview"
+  "gemini-flash-latest",
+  "gemini-2.0-flash"
 ].filter(Boolean);
 
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+let cachedGroqModel = "";
+
+async function getAvailableGroqModels() {
+  const preferred = [
+    process.env.GROQ_MODEL,
+    cachedGroqModel,
+    "llama-3.1-8b-instant",
+    "llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "qwen-qwq-32b",
+    "qwen/qwen3-32b",
+    "gemma2-9b-it",
+    "llama3-8b-8192",
+    "llama3-70b-8192"
+  ].filter(Boolean);
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { "Authorization": `Bearer ${GROQ_KEY}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const available = (data.data || [])
+        .map(m => m.id)
+        .filter(id => !/whisper|tts|guard|embed|vision|orpheus|playai|allam/i.test(id));
+      
+      // Avval preferred ichidan mavjudlarini, keyin qolgan barcha chat modellarini tartiblaymiz
+      const matched = preferred.filter(p => available.includes(p));
+      const others = available.filter(a => !matched.includes(a));
+      const combined = [...new Set([...matched, ...others])];
+      if (combined.length > 0) return combined;
+    }
+  } catch (e) {
+    // Tarmoq xatosi bo'lsa preferred ro'yxatidan foydalanamiz
+  }
+  return [...new Set(preferred)];
+}
 
 function buildPrompt(speakerName, partnerName) {
   const recent = messages.slice(-14).map(m => `${m.name}: ${m.content}`).join("\n\n");
@@ -27,15 +64,21 @@ function buildPrompt(speakerName, partnerName) {
     `Sen Telegram Mini App ichidagi jonli suhbat xonasidasan. Bu yerda Foydalanuvchi (Inson) va sening AI hamkasbing "${partnerName}" bor.`,
     `Qoidalar:`,
     `1. Faqat o'zbek tilida, tabiiy, erkin va qiziqarli tilda yoz.`,
-    `2. Javobing qisqa va mazmunli bo'lsin (2-4 gap atrofida).`,
+    `2. Javobing to'liq, tugallangan va mazmunli bo'lsin (2-4 gap atrofida). Gapni yarim yo'lda qoldirma.`,
     `3. Oxirgi bildirilgan fikrga (foydalanuvchi yoki ${partnerName} fikriga) munosabat bildir, qo'shimcha qil yoki bahsni qizdiruvchi savol tashla.`,
     `4. O'z ismingni gap boshida takrorlama, to'g'ridan-to'g'ri fikringni yoz.`,
     ``,
     `Suhbat tarixi:`,
     recent,
     ``,
-    `${speakerName}ning navbatdagi javobi:`
+    `${speakerName}ning navbatdagi to'liq javobi:`
   ].join("\n");
+}
+
+function cleanReply(text) {
+  return String(text || "")
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .trim();
 }
 
 async function askGemini() {
@@ -47,14 +90,18 @@ async function askGemini() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildPrompt("Gemini", "Groq") }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 350 }
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 1024
+        }
       })
     });
 
     if (res.ok) {
       const data = await res.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (reply) return reply.trim();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const reply = parts.map(p => p.text || "").join("").trim();
+      if (reply) return cleanReply(reply);
     } else {
       lastError = await res.text();
     }
@@ -63,35 +110,46 @@ async function askGemini() {
 }
 
 async function askGroq() {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${GROQ_KEY}`
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: "Sen Groq platformasida ishlovchi tezkor, zukko va erkin fikrlovchi AI suhbatdoshsan. Faqat o'zbek tilida javob berasan."
-        },
-        {
-          role: "user",
-          content: buildPrompt("Groq", "Gemini")
-        }
-      ],
-      temperature: 0.8,
-      max_tokens: 350
-    })
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Groq API xatosi (${res.status}): ${errText.slice(0, 140)}`);
+  let lastError = "";
+  const modelsToTry = await getAvailableGroqModels();
+
+  for (const model of modelsToTry) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_KEY}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "Sen Groq platformasida ishlovchi tezkor, zukko va erkin fikrlovchi AI suhbatdoshsan. Faqat o'zbek tilida to'liq va tugallangan gaplar bilan javob berasan."
+          },
+          {
+            role: "user",
+            content: buildPrompt("Groq", "Gemini")
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 800
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const reply = cleanReply(data?.choices?.[0]?.message?.content);
+      if (reply) {
+        cachedGroqModel = model;
+        return reply;
+      }
+    } else {
+      lastError = await res.text();
+    }
   }
-  const data = await res.json();
-  const reply = data?.choices?.[0]?.message?.content;
-  return (reply || "Javob qaytarishda uzilish yuz berdi.").trim();
+
+  throw new Error(`Groq API xatosi: ${lastError.slice(0, 140)}`);
 }
 
 async function runConversationRound() {

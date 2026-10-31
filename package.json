@@ -1,6 +1,6 @@
 {
   "name": "ai-suhbat",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "description": "Telegram Mini App - Gemini va Groq erkin suhbat xonasi",
   "main": "server.js",
   "scripts": {
