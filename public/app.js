@@ -4,6 +4,16 @@ if (tg) {
   tg.expand();
 }
 
+// iOS va mobil brauzerlarda pinch-to-zoom hamda double-tap zoomni bloklash
+document.addEventListener("gesturestart", e => e.preventDefault(), { passive: false });
+document.addEventListener("gesturechange", e => e.preventDefault(), { passive: false });
+document.addEventListener("gestureend", e => e.preventDefault(), { passive: false });
+document.addEventListener("touchmove", e => {
+  if (e.touches && e.touches.length > 1) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
 const feed = document.getElementById("feed");
 const form = document.getElementById("form");
 const input = document.getElementById("message");

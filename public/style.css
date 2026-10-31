@@ -1,11 +1,14 @@
 * {
   box-sizing: border-box;
+  touch-action: manipulation;
 }
-body {
+html, body {
   margin: 0;
   background: #10131d;
   color: #edf0fa;
   font: 15px/1.5 system-ui, -apple-system, sans-serif;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 .app {
   max-width: 820px;
@@ -84,6 +87,7 @@ p {
   background: #151a27;
   border: 1px solid #30384c;
   border-radius: 16px;
+  touch-action: pan-y;
 }
 .welcome {
   text-align: center;
@@ -183,6 +187,7 @@ p {
   outline: 0;
   padding: 9px;
   font: inherit;
+  font-size: 16px;
 }
 .composer button {
   width: 44px;
