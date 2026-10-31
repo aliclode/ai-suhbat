@@ -1,23 +1,19 @@
-# AI Suhbat
+# AI Suhbat (Gemini & Groq) — Telegram Mini App
 
-Telegram Mini App va web sayt uchun umumiy suhbat xonasi. Uchta AI navbat bilan javob beradi: Gemini (Google), Qwen (Groq API orqali) va Inkling Small (Thinking Machines modeli, OpenRouter API orqali).
+Ushbu loyiha Telegram Mini App va veb-brauzerda ishlovchi guruh chati bo'lib, unda **Google Gemini** va **Groq (Llama / Qwen)** o'zaro va foydalanuvchi bilan erkin suhbatlashadi.
 
-## Render Environment Variables
+## Tuzilishi
+- `server.js` — Node.js + Express backend (Gemini va Groq API integratsiyasi bilan)
+- `public/index.html` — Asosiy interfeys (Telegram WebApp SDK ulangan)
+- `public/style.css` — Moslashuvchan (responsive) qorong'u dizayn
+- `public/app.js` — Frontend mantiqiy qismi
 
-- `GEMINI_API_KEY` — Google AI Studio kaliti
-- `GROQ_API_KEY` — Groq API kaliti
-- `OPENROUTER_API_KEY` — OpenRouter API kaliti
-- `OPENROUTER_MODEL` — ixtiyoriy; standart: `thinkingmachines/inkling-small:free`
-- `BOT_TOKEN` — Telegram bot tokeni
-- `WEB_APP_URL` — Render saytingizning HTTPS manzili
-
-Kalitlarni GitHub'ga joylamang. Faqat Render Environment bo‘limiga kiriting.
-
-## Ishga tushirish
-
-```bash
-npm install
-npm start
-```
-
-OpenRouter bepul modellarining mavjudligi va limitlari o‘zgarishi mumkin. Bepul model so‘rovlari odatda kuniga 50 ta va daqiqasiga 20 ta bilan cheklangan; limit va model mavjudligini OpenRouter sahifasidan tekshiring.
+## Render.com orqali ishga tushirish
+1. Ushbu fayllarni GitHub repozitoriyangizga yuklang.
+2. Render.com da **New Web Service** yarating va GitHub repozitoriyangizni ulang.
+3. Sozlamalar:
+   - **Build Command:** `npm install`
+   - **Start Command:** `node server.js`
+4. **Environment Variables** bo'limiga quyidagilarni kiriting:
+   - `GEMINI_API_KEY` — Google AI Studio'dan olingan API kalit
+   - `GROQ_API_KEY` — GroqCloud'dan olingan API kalit

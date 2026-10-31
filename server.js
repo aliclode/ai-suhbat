@@ -1,205 +1,181 @@
-require("dotenv").config();
 const express = require("express");
 const path = require("path");
-const TelegramBot = require("node-telegram-bot-api");
-
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+
+app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const agents = [
-  {
-    id: "gemini", name: "Gemini", company: "Google",
-    model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
-    role: "Curious, balanced and explanatory. Explore possibilities and ask thoughtful questions."
-  },
-  {
-    id: "qwen", name: "Qwen", company: "Alibaba · Groq API",
-    model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
-    role: "Analytical, direct and evidence-minded. Challenge weak assumptions respectfully."
-  },
-  {
-    id: "openrouter", name: "Inkling", company: "Thinking Machines · OpenRouter",
-    model: process.env.OPENROUTER_MODEL || "thinkingmachines/inkling-small:free",
-    role: "Creative, practical and socially perceptive. Offer fresh angles and useful examples."
-  }
-];
-
-const room = [];
+let messages = [];
 let busy = false;
-let debateRunning = false;
-const MAX_HISTORY = 45;
-const MAX_TEXT = 2500;
 
-function addMessage(role, name, content, source = "web") {
-  const item = { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, role, name,
-    content: String(content).slice(0, MAX_TEXT), source, time: new Date().toISOString() };
-  room.push(item);
-  if (room.length > MAX_HISTORY) room.splice(0, room.length - MAX_HISTORY);
-  return item;
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+const GROQ_KEY = process.env.GROQ_API_KEY || "";
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+
+function buildPrompt(speakerName, partnerName) {
+  const recent = messages.slice(-14).map(m => `${m.name}: ${m.content}`).join("\n\n");
+  return [
+    `Sen "${speakerName}" nomli aqlli va samimiy sun'iy intellektsan.`,
+    `Sen Telegram Mini App ichidagi jonli suhbat xonasidasan. Bu yerda Foydalanuvchi (Inson) va sening AI hamkasbing "${partnerName}" bor.`,
+    `Qoidalar:`,
+    `1. Faqat o'zbek tilida, tabiiy, erkin va qiziqarli tilda yoz.`,
+    `2. Javobing qisqa va mazmunli bo'lsin (2-4 gap atrofida).`,
+    `3. Oxirgi bildirilgan fikrga (foydalanuvchi yoki ${partnerName} fikriga) munosabat bildir, qo'shimcha qil yoki bahsni qizdiruvchi savol tashla.`,
+    `4. O'z ismingni gap boshida takrorlama, to'g'ridan-to'g'ri fikringni yoz.`,
+    ``,
+    `Suhbat tarixi:`,
+    recent,
+    ``,
+    `${speakerName}ning navbatdagi javobi:`
+  ].join("\n");
 }
 
-function historyForApi() {
-  return room.slice(-18).map(m => ({
-    role: m.role === "human" ? "user" : "assistant",
-    content: `${m.name}: ${m.content}`.slice(0, 3000)
-  }));
-}
-
-async function postJson(url, headers, body, provider) {
-  const response = await fetch(url, {
+async function askGemini() {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45000)
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: buildPrompt("Gemini", "Groq") }] }],
+      generationConfig: { temperature: 0.8, maxOutputTokens: 350 }
+    })
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const msg = data.error?.message || data.message || `HTTP ${response.status}`;
-    throw new Error(`${provider}: ${msg}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API xatosi (${res.status}): ${errText.slice(0, 120)}`);
   }
-  const answer = provider === "Gemini"
-    ? data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim()
-    : data.choices?.[0]?.message?.content?.trim();
-  if (!answer) throw new Error(`${provider}: bo‘sh javob qaytdi.`);
-  return answer;
+  const data = await res.json();
+  const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return (reply || "Fikr bildirishda kichik uzilish bo'ldi.").trim();
 }
 
-async function askAgent(agent) {
-  const history = historyForApi();
-  const system = `You are ${agent.name}, an AI from ${agent.company}, in a shared group conversation with two other independent AI systems and human participants. Your conversational personality: ${agent.role}
-Speak naturally in Uzbek unless the conversation is in another language. You are an equal participant. React to the latest message and to the actual ideas already expressed; do not repeat previous answers. You may agree, disagree politely, ask another AI a question, or introduce a new angle. Keep the answer concise (2-4 sentences). Do not claim human feelings or personal experiences.`;
-  if (agent.id === "gemini") {
-    if (!process.env.GEMINI_API_KEY) throw new Error("Gemini: GEMINI_API_KEY kiritilmagan.");
-    const contents = [
-      { role: "user", parts: [{ text: system + "\n\nSuhbat tarixi:\n" + history.map(x => x.content).join("\n") }] }
-    ];
-    const data = await postJson(
-      `https://generativelanguage.googleapis.com/v1beta/models/${agent.model}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,
-      {}, { contents, generationConfig: { temperature: 0.8, maxOutputTokens: 220 } }, "Gemini"
-    );
-    return data;
+async function askGroq() {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "Sen Groq platformasida ishlovchi tezkor, zukko va erkin fikrlovchi AI suhbatdoshsan. Faqat o'zbek tilida javob berasan."
+        },
+        {
+          role: "user",
+          content: buildPrompt("Groq", "Gemini")
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: 350
+    })
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq API xatosi (${res.status}): ${errText.slice(0, 120)}`);
   }
-  if (agent.id === "qwen") {
-    if (!process.env.GROQ_API_KEY) throw new Error("Llama/Groq: GROQ_API_KEY kiritilmagan.");
-    return postJson("https://api.groq.com/openai/v1/chat/completions",
-      { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      { model: agent.model, messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.8, max_tokens: 220 }, "Qwen (Groq)");
-  }
-  if (agent.id === "openrouter") {
-    if (!process.env.OPENROUTER_API_KEY) throw new Error("OpenRouter: OPENROUTER_API_KEY kiritilmagan.");
-    return postJson("https://openrouter.ai/api/v1/chat/completions",
-      { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "HTTP-Referer": process.env.WEB_APP_URL || "https://ai-suhbat.onrender.com", "X-Title": "AI Suhbat" },
-      { model: agent.model, messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.8, max_tokens: 220 }, "OpenRouter (Inkling)");
-  }
-  throw new Error("Noma’lum AI provayderi.");
+  const data = await res.json();
+  const reply = data?.choices?.[0]?.message?.content;
+  return (reply || "Javob qaytarishda uzilish yuz berdi.").trim();
 }
 
-async function speakAgent(agent, source, sendReply) {
-  try {
-    const answer = await askAgent(agent);
-    addMessage("ai", agent.name, answer, source);
-    if (sendReply) await sendReply(`*${agent.name} (${agent.company}):*\n${answer}`);
-    return true;
-  } catch (err) {
-    console.error(err.message);
-    addMessage("system", "Tizim", err.message, source);
-    if (sendReply) await sendReply(`⚠️ ${agent.name}: ${err.message}`);
-    return false;
-  }
-}
-
-async function runRound(source, sendReply) {
-  // Har bir AI oldingi AI yozgan javobni tarixdan o‘qib, navbat bilan javob beradi.
-  for (const agent of agents) await speakAgent(agent, source, sendReply);
-}
-
-async function processHumanMessage(message, source, sendReply) {
-  if (busy) {
-    if (sendReply) await sendReply("AI'lar hozir javob bermoqda. Birozdan keyin yozing.");
-    return false;
-  }
+async function runConversationRound() {
+  if (busy) return;
   busy = true;
   try {
-    addMessage("human", source === "telegram" ? "Telegram ishtirokchisi" : "Sayt ishtirokchisi", message, source);
-    await runRound(source, sendReply);
-    return true;
-  } finally {
-    busy = false;
-  }
-}
-
-async function runFreeDiscussion(source = "web", sendReply) {
-  if (busy || debateRunning) return false;
-  busy = true;
-  debateRunning = true;
-  try {
-    // Bitta tugma bosilganda ikki qo‘shimcha aylana: AI'lar o‘zaro fikr almashadi.
-    for (let round = 0; round < 2; round++) {
-      addMessage("system", "Suhbat", `${round + 1}-erkin munozara davrasi boshlandi.`, source);
-      await runRound(source, sendReply);
+    if (!GEMINI_KEY && !GROQ_KEY) {
+      messages.push({
+        role: "system",
+        name: "Tizim",
+        content: "Serverda GEMINI_API_KEY va GROQ_API_KEY sozlanmagan. Render Environment Variables bo'limiga kalitlarni kiriting.",
+        time: Date.now()
+      });
+      return;
     }
-    return true;
+
+    if (GEMINI_KEY) {
+      const geminiReply = await askGemini();
+      messages.push({
+        role: "ai",
+        name: "Gemini",
+        content: geminiReply,
+        time: Date.now()
+      });
+    }
+
+    if (GROQ_KEY) {
+      const groqReply = await askGroq();
+      messages.push({
+        role: "ai",
+        name: "Groq",
+        content: groqReply,
+        time: Date.now()
+      });
+    }
+
+    if (messages.length > 100) {
+      messages = messages.slice(-100);
+    }
+  } catch (err) {
+    messages.push({
+      role: "system",
+      name: "Tizim",
+      content: "Xatolik: " + err.message,
+      time: Date.now()
+    });
   } finally {
-    debateRunning = false;
     busy = false;
   }
 }
 
-app.get("/api/config", (_req, res) => res.json({
-  agents: agents.map(a => ({ id:a.id, name:a.name, company:a.company })),
-  ready: {
-    gemini: Boolean(process.env.GEMINI_API_KEY),
-    llama: Boolean(process.env.GROQ_API_KEY),
-    openrouter: Boolean(process.env.OPENROUTER_API_KEY)
-  },
-  telegramMiniApp: Boolean(process.env.BOT_TOKEN && process.env.WEB_APP_URL),
-  busy
-}));
-app.get("/api/messages", (_req, res) => res.json({ messages: room, busy }));
-app.post("/api/message", async (req, res) => {
-  const message = String(req.body?.text || "").trim().slice(0, MAX_TEXT);
-  if (!message) return res.status(400).json({ error: "Xabar bo‘sh." });
-  if (busy) return res.status(409).json({ error: "AI'lar hozir suhbatlashmoqda. Biroz kuting." });
-  res.json({ accepted: true });
-  processHumanMessage(message, "web").catch(err => console.error(err));
+app.get("/api/messages", (req, res) => {
+  res.json({ messages, busy });
 });
-app.post("/api/debate/start", async (_req, res) => {
-  if (busy) return res.status(409).json({ error: "Suhbat allaqachon davom etmoqda." });
-  if (!room.length) return res.status(400).json({ error: "Avval suhbatga birinchi mavzu yoki savol yozing." });
-  res.json({ accepted: true });
-  runFreeDiscussion("web").catch(console.error);
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    ready: {
+      gemini: Boolean(GEMINI_KEY),
+      groq: Boolean(GROQ_KEY)
+    }
+  });
 });
-app.get("/health", (_req, res) => res.json({ ok:true }));
 
-let bot;
-if (process.env.BOT_TOKEN) {
-  bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-  bot.on("polling_error", err => console.error("Telegram polling:", err.message));
-  bot.onText(/^\/start$/, async msg => {
-    const opts = process.env.WEB_APP_URL ? {
-      reply_markup: { inline_keyboard: [[{ text: "🌐 AI Suhbatni ochish", web_app: { url: process.env.WEB_APP_URL } }]] }
-    } : {};
-    await bot.sendMessage(msg.chat.id,
-      "Salom! Gemini, Qwen va Inkling bir xonada suhbatlashadi. Mini App tugmasini bosing yoki shu yerga xabar yozing.", opts);
-  });
-  bot.on("message", async msg => {
-    if (!msg.text || msg.text.startsWith("/")) return;
-    await processHumanMessage(msg.text, "telegram", text =>
-      bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" })
-    );
-  });
-  if (process.env.WEB_APP_URL) {
-    bot.setChatMenuButton({ menu_button: { type: "web_app", text: "AI Suhbat", web_app: { url: process.env.WEB_APP_URL } } })
-      .catch(err => console.error("Mini App menu button:", err.message));
-  }
-  console.log("Telegram bot polling yoqildi.");
-} else {
-  console.log("BOT_TOKEN yo‘q: Telegram bot ishga tushmadi.");
-}
+app.post("/api/message", (req, res) => {
+  const text = String(req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Xabar matni bo'sh bo'lishi mumkin emas." });
+  if (busy) return res.status(429).json({ error: "AI'lar hozir javob yozmoqda, biroz kuting." });
 
-app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`AI Suhbat serveri ${port}-portda ishga tushdi.`));
+  messages.push({
+    role: "human",
+    name: "Siz",
+    content: text.slice(0, 2500),
+    time: Date.now()
+  });
+
+  runConversationRound();
+  res.json({ ok: true });
+});
+
+app.post("/api/debate/start", (req, res) => {
+  if (busy) return res.status(429).json({ error: "AI'lar hozir band." });
+  if (!messages.length) return res.status(400).json({ error: "Avval suhbat uchun biror mavzu yozing." });
+
+  runConversationRound();
+  res.json({ ok: true });
+});
+
+app.post("/api/clear", (req, res) => {
+  if (busy) return res.status(429).json({ error: "AI'lar javob yozib bo'lishini kuting." });
+  messages = [];
+  res.json({ ok: true });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`AI Suhbat serveri ${PORT}-portda ishga tushdi`);
+});

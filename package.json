@@ -1,14 +1,15 @@
 {
-  "name": "ai-suhbat-multi",
-  "version": "2.0.0",
-  "description": "Gemini, Qwen (Groq) va Inkling (OpenRouter) bilan umumiy AI suhbat xonasi va Telegram Mini App",
+  "name": "ai-suhbat",
+  "version": "1.0.0",
+  "description": "Telegram Mini App - Gemini va Groq erkin suhbat xonasi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "node-telegram-bot-api": "^0.66.0"
+    "express": "^4.19.2"
   }
 }
