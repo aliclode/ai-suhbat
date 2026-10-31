@@ -1,13 +1,13 @@
 {
-  "name": "ai-suhbat",
-  "version": "1.1.0",
-  "private": true,
-  "description": "Shared AI group chat website and Telegram bot",
+  "name": "ai-suhbat-multi",
+  "version": "2.0.0",
+  "description": "Gemini, Llama (Groq) va Mistral bilan umumiy AI suhbat xonasi va Telegram Mini App",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "node-telegram-bot-api": "^0.66.0"
   }

@@ -1,28 +1,39 @@
-# AI Social World
+# AI Suhbat — 3 kompaniya + Telegram Mini App
 
-AI Social World — beshta alohida xarakterga ega AI ishtirokchi va inson bitta umumiy chatda suhbatlashadigan web-ilova.
+Ushbu loyiha bitta umumiy chat xonasida:
+- Gemini (Google)
+- Llama 3.3 70B (Meta modeli, Groq API orqali)
+- Mistral Small (Mistral AI)
 
-## Talablar
-- Node.js 18 yoki undan yangi
-- OpenAI API kaliti (API foydalanishi alohida to‘lov talab qilishi mumkin)
+modellari bilan ishlaydi. Har bir foydalanuvchi xabaridan keyin uchala model navbat bilan javob beradi. “AI'lar o‘zaro davom ettirsin” tugmasi ikki qo‘shimcha munozara aylanasini ishga tushiradi.
 
 ## Ishga tushirish
-1. Ushbu papkani kompyuteringizga oching.
-2. Terminalda shu papkaga kiring.
-3. `npm install` buyrug‘ini bajaring.
-4. `.env.example` faylidan nusxa olib, nusxasini `.env` deb nomlang.
-5. `.env` ichida `OPENAI_API_KEY=...` qatoriga o‘z API kalitingizni kiriting.
-6. Istasangiz `OPENAI_MODEL` qiymatini o‘zgartiring. Standart model: `gpt-4o-mini`.
-7. `npm start` buyrug‘ini bajaring.
-8. Brauzerda `http://localhost:3000` manzilini oching.
+1. `npm install`
+2. `.env.example` faylidan `.env` nusxa oling va API kalitlarini kiriting.
+3. `npm start`
 
-## Qanday ishlaydi
-- **Boshlash** bosilganda AI ishtirokchilar suhbatni boshlaydi.
-- Inson istalgan paytda xabar yuboradi; barcha AI ishtirokchilar navbat bilan javob beradi.
-- Keyin AI'lar suhbatni davom ettiradi.
-- **To‘xtatish** tugmasi avtomatik davom etuvchi suhbatni to‘xtatadi.
+## Render Environment Variables
+- `GEMINI_API_KEY`
+- `GROQ_API_KEY`
+- `MISTRAL_API_KEY`
+- `BOT_TOKEN`
+- `WEB_APP_URL` — Render'dagi HTTPS manzil, masalan `https://your-app.onrender.com`
+
+Build Command: `npm install`
+Start Command: `npm start`
+
+Botda `/start` yuborilganda Mini App tugmasi chiqadi. Bot menyusiga ham “AI Suhbat” Web App tugmasi qo‘yiladi.
+
+## API kalitlar
+- Gemini: https://aistudio.google.com/apikey
+- Groq: https://console.groq.com/keys
+- Mistral: https://console.mistral.ai/api-keys/
 
 ## Muhim
-- API kalitini hech qachon frontend kodiga joylamang; faqat `.env` faylida saqlang.
-- AI'larning avtomatik suhbatlari API so‘rovlarini va xarajatlarni oshirishi mumkin. Sinovda qisqa vaqt ishlating.
-- Bu boshlang‘ich versiya bitta brauzer sessiyasi uchun mo‘ljallangan; foydalanuvchi akkauntlari va suhbat tarixini bazada saqlash hali qo‘shilmagan.
+- Bepul tariflar limitli va provayder shartlari o‘zgarishi mumkin. Limit tugasa tegishli AI xatolik qaytaradi; ilova pullik tarifga avtomatik o‘tmaydi.
+- Gemini free tier modelga qarab farq qiladi; default `gemini-2.5-flash`.
+- Groq API default modeli `llama-3.3-70b-versatile`.
+- Mistral API free tier/experiment access hisobga qarab farq qilishi mumkin; default `mistral-small-latest`.
+- Sayt va Telegram bir xil server xotirasini ishlatadi. Render qayta ishga tushsa chat tarixi o‘chadi; doimiy tarix uchun keyinchalik database ulash kerak.
+- Telegram Mini App URL HTTPS bo‘lishi shart.
+- API kalitlarini GitHub'ga commit qilmang. Faqat Render Environment Variables ichida saqlang.
