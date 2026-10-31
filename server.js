@@ -19,8 +19,8 @@ const agents = [
     role: "Analytical, direct and evidence-minded. Challenge weak assumptions respectfully."
   },
   {
-    id: "mistral", name: "Mistral", company: "Mistral AI",
-    model: process.env.MISTRAL_MODEL || "mistral-small-latest",
+    id: "openrouter", name: "Inkling", company: "Thinking Machines · OpenRouter",
+    model: process.env.OPENROUTER_MODEL || "thinkingmachines/inkling-small:free",
     role: "Creative, practical and socially perceptive. Offer fresh angles and useful examples."
   }
 ];
@@ -87,12 +87,12 @@ Speak naturally in Uzbek unless the conversation is in another language. You are
       { model: agent.model, messages: [{ role: "system", content: system }, ...history],
         temperature: 0.8, max_tokens: 220 }, "Qwen (Groq)");
   }
-  if (agent.id === "mistral") {
-    if (!process.env.MISTRAL_API_KEY) throw new Error("Mistral: MISTRAL_API_KEY kiritilmagan.");
-    return postJson("https://api.mistral.ai/v1/chat/completions",
-      { Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` },
+  if (agent.id === "openrouter") {
+    if (!process.env.OPENROUTER_API_KEY) throw new Error("OpenRouter: OPENROUTER_API_KEY kiritilmagan.");
+    return postJson("https://openrouter.ai/api/v1/chat/completions",
+      { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "HTTP-Referer": process.env.WEB_APP_URL || "https://ai-suhbat.onrender.com", "X-Title": "AI Suhbat" },
       { model: agent.model, messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.8, max_tokens: 220 }, "Mistral");
+        temperature: 0.8, max_tokens: 220 }, "OpenRouter (Inkling)");
   }
   throw new Error("Noma’lum AI provayderi.");
 }
@@ -153,7 +153,7 @@ app.get("/api/config", (_req, res) => res.json({
   ready: {
     gemini: Boolean(process.env.GEMINI_API_KEY),
     llama: Boolean(process.env.GROQ_API_KEY),
-    mistral: Boolean(process.env.MISTRAL_API_KEY)
+    openrouter: Boolean(process.env.OPENROUTER_API_KEY)
   },
   telegramMiniApp: Boolean(process.env.BOT_TOKEN && process.env.WEB_APP_URL),
   busy
@@ -183,7 +183,7 @@ if (process.env.BOT_TOKEN) {
       reply_markup: { inline_keyboard: [[{ text: "🌐 AI Suhbatni ochish", web_app: { url: process.env.WEB_APP_URL } }]] }
     } : {};
     await bot.sendMessage(msg.chat.id,
-      "Salom! Gemini, Llama va Mistral bir xonada suhbatlashadi. Mini App tugmasini bosing yoki shu yerga xabar yozing.", opts);
+      "Salom! Gemini, Qwen va Inkling bir xonada suhbatlashadi. Mini App tugmasini bosing yoki shu yerga xabar yozing.", opts);
   });
   bot.on("message", async msg => {
     if (!msg.text || msg.text.startsWith("/")) return;
