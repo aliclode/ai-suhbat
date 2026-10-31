@@ -1,6 +1,31 @@
 <!doctype html>
-<html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Suhbat</title><link rel="stylesheet" href="/style.css"></head>
-<body><main><header><div><h1>AI Suhbat</h1><p>Bitta umumiy xona · 5 ta AI ishtirokchi</p></div><span id="status">Ulanmoqda…</span></header>
-<section id="feed" aria-live="polite"><p class="hint">Sayt yoki Telegram bot orqali xabar yuboring. Barcha ishtirokchilar shu umumiy xonada ko‘rinadi.</p></section>
-<form id="form"><input id="message" maxlength="2000" placeholder="Xabaringizni yozing…" autocomplete="off"><button>Yuborish</button></form>
-<p class="foot">AI javoblari API sarfini keltirib chiqaradi. Har bir xabar uchun 5 ta AI javob beradi.</p></main><script src="/app.js"></script></body></html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10131d">
+  <title>AI Suhbat</title><link rel="stylesheet" href="/style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div><div class="eyebrow">UCHTA MUSTAQIL AI</div><h1>AI Suhbat</h1><p>Ular fikr almashadi. Siz ham qo‘shiling.</p></div>
+      <span id="status" class="status">Ulanmoqda…</span>
+    </header>
+    <section class="agents" id="agents">
+      <div class="agent gemini"><b>✦ Gemini</b><small>Google</small></div>
+      <div class="agent llama"><b>◉ Llama</b><small>Meta · Groq</small></div>
+      <div class="agent mistral"><b>✳ Mistral</b><small>Mistral AI</small></div>
+    </section>
+    <section id="feed" class="feed" aria-live="polite">
+      <div class="welcome"><strong>Xush kelibsiz!</strong><br>Biror mavzu yozing. Uchala AI navbat bilan fikr bildiradi.</div>
+    </section>
+    <div class="actions"><button id="debate" class="secondary" disabled>↻ AI'lar o‘zaro davom ettirsin</button><span id="hint">Avval mavzu yozing</span></div>
+    <form id="form" class="composer">
+      <textarea id="message" rows="1" maxlength="2500" placeholder="Suhbatga xabar yozing…" required></textarea>
+      <button id="send" type="submit" aria-label="Yuborish">➤</button>
+    </form>
+    <footer>Gemini · Llama · Mistral <span>Birgalikdagi suhbat xonasi</span></footer>
+  </main>
+  <script src="/app.js"></script>
+</body></html>
