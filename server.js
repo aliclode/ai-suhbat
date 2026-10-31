@@ -10,12 +10,12 @@ app.use(express.static(path.join(__dirname, "public")));
 const agents = [
   {
     id: "gemini", name: "Gemini", company: "Google",
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
     role: "Curious, balanced and explanatory. Explore possibilities and ask thoughtful questions."
   },
   {
-    id: "llama", name: "Llama", company: "Meta · Groq API",
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    id: "qwen", name: "Qwen", company: "Alibaba · Groq API",
+    model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
     role: "Analytical, direct and evidence-minded. Challenge weak assumptions respectfully."
   },
   {
@@ -80,12 +80,12 @@ Speak naturally in Uzbek unless the conversation is in another language. You are
     );
     return data;
   }
-  if (agent.id === "llama") {
+  if (agent.id === "qwen") {
     if (!process.env.GROQ_API_KEY) throw new Error("Llama/Groq: GROQ_API_KEY kiritilmagan.");
     return postJson("https://api.groq.com/openai/v1/chat/completions",
       { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
       { model: agent.model, messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.8, max_tokens: 220 }, "Llama (Groq)");
+        temperature: 0.8, max_tokens: 220 }, "Qwen (Groq)");
   }
   if (agent.id === "mistral") {
     if (!process.env.MISTRAL_API_KEY) throw new Error("Mistral: MISTRAL_API_KEY kiritilmagan.");

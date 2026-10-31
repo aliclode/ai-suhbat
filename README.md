@@ -2,7 +2,7 @@
 
 Ushbu loyiha bitta umumiy chat xonasida:
 - Gemini (Google)
-- Llama 3.3 70B (Meta modeli, Groq API orqali)
+- Qwen 3.8 27B (Alibaba modeli, Groq API orqali)
 - Mistral Small (Mistral AI)
 
 modellari bilan ishlaydi. Har bir foydalanuvchi xabaridan keyin uchala model navbat bilan javob beradi. “AI'lar o‘zaro davom ettirsin” tugmasi ikki qo‘shimcha munozara aylanasini ishga tushiradi.
@@ -32,7 +32,7 @@ Botda `/start` yuborilganda Mini App tugmasi chiqadi. Bot menyusiga ham “AI Su
 ## Muhim
 - Bepul tariflar limitli va provayder shartlari o‘zgarishi mumkin. Limit tugasa tegishli AI xatolik qaytaradi; ilova pullik tarifga avtomatik o‘tmaydi.
 - Gemini free tier modelga qarab farq qiladi; default `gemini-2.5-flash`.
-- Groq API default modeli `llama-3.3-70b-versatile`.
+- Groq API default modeli `qwen/qwen3.8-27b`.
 - Mistral API free tier/experiment access hisobga qarab farq qilishi mumkin; default `mistral-small-latest`.
 - Sayt va Telegram bir xil server xotirasini ishlatadi. Render qayta ishga tushsa chat tarixi o‘chadi; doimiy tarix uchun keyinchalik database ulash kerak.
 - Telegram Mini App URL HTTPS bo‘lishi shart.
