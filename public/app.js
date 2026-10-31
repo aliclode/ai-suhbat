@@ -10,7 +10,7 @@ const hint = document.getElementById("hint");
 let lastCount = 0, busy = false;
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function cssName(m){return m.role==="human"?"human":m.role==="system"?"system":({Gemini:"gemini",Qwen:"qwen",Mistral:"mistral"}[m.name]||"system");}
+function cssName(m){return m.role==="human"?"human":m.role==="system"?"system":({Gemini:"gemini",Qwen:"qwen",Inkling:"mistral"}[m.name]||"system");}
 function render(messages){
   if(!messages.length)return;
   if(messages.length===lastCount)return;
@@ -25,7 +25,7 @@ async function refresh(){
     render(d.messages||[]);setBusy(Boolean(d.busy));
     const ready=cfg.ready||{};
     statusEl.textContent=`API: ${Object.values(ready).filter(Boolean).length}/3`;
-    statusEl.title=`Gemini ${ready.gemini?"tayyor":"kalit yo‘q"} · Llama ${ready.llama?"tayyor":"kalit yo‘q"} · Mistral ${ready.mistral?"tayyor":"kalit yo‘q"}`;
+    statusEl.title=`Gemini ${ready.gemini?"tayyor":"kalit yo‘q"} · Llama ${ready.llama?"tayyor":"kalit yo‘q"} · Inkling ${ready.openrouter?"tayyor":"kalit yo‘q"}`;
   }catch(e){statusEl.textContent="Ulanishda xato";}
 }
 function setBusy(v){busy=v;send.disabled=v;debate.disabled=v||lastCount===0;hint.textContent=v?"AI'lar javob bermoqda…":"Xabar yozishingiz mumkin";}
