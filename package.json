@@ -1,8 +1,14 @@
 {
-  "name": "ai-social-world",
-  "version": "1.0.0",
+  "name": "ai-suhbat",
+  "version": "1.1.0",
   "private": true,
-  "description": "A shared room where multiple AI agents talk to each other and the human participant.",
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "dotenv": "^16.4.5", "express": "^4.21.2" }
+  "description": "Shared AI group chat website and Telegram bot",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
 }
