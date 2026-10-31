@@ -11,7 +11,13 @@ let busy = false;
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const GROQ_KEY = process.env.GROQ_API_KEY || "";
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODELS = [
+  process.env.GEMINI_MODEL,
+  "gemini-flash-latest",
+  "gemini-2.5-flash-lite",
+  "gemini-3-flash-preview"
+].filter(Boolean);
+
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 function buildPrompt(speakerName, partnerName) {
@@ -33,22 +39,27 @@ function buildPrompt(speakerName, partnerName) {
 }
 
 async function askGemini() {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt("Gemini", "Groq") }] }],
-      generationConfig: { temperature: 0.8, maxOutputTokens: 350 }
-    })
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API xatosi (${res.status}): ${errText.slice(0, 120)}`);
+  let lastError = "";
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: buildPrompt("Gemini", "Groq") }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 350 }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (reply) return reply.trim();
+    } else {
+      lastError = await res.text();
+    }
   }
-  const data = await res.json();
-  const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  return (reply || "Fikr bildirishda kichik uzilish bo'ldi.").trim();
+  throw new Error(`Gemini API xatosi: ${lastError.slice(0, 140)}`);
 }
 
 async function askGroq() {
@@ -76,7 +87,7 @@ async function askGroq() {
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Groq API xatosi (${res.status}): ${errText.slice(0, 120)}`);
+    throw new Error(`Groq API xatosi (${res.status}): ${errText.slice(0, 140)}`);
   }
   const data = await res.json();
   const reply = data?.choices?.[0]?.message?.content;
@@ -91,50 +102,39 @@ async function runConversationRound() {
       messages.push({
         role: "system",
         name: "Tizim",
-        content: "Serverda GEMINI_API_KEY va GROQ_API_KEY sozlanmagan. Render Environment Variables bo'limiga kalitlarni kiriting.",
+        content: "Serverda GEMINI_API_KEY va GROQ_API_KEY sozlanmagan.",
         time: Date.now()
       });
       return;
     }
 
     if (GEMINI_KEY) {
-      const geminiReply = await askGemini();
-      messages.push({
-        role: "ai",
-        name: "Gemini",
-        content: geminiReply,
-        time: Date.now()
-      });
+      try {
+        const geminiReply = await askGemini();
+        messages.push({ role: "ai", name: "Gemini", content: geminiReply, time: Date.now() });
+      } catch (err) {
+        messages.push({ role: "system", name: "Tizim", content: err.message, time: Date.now() });
+      }
     }
 
     if (GROQ_KEY) {
-      const groqReply = await askGroq();
-      messages.push({
-        role: "ai",
-        name: "Groq",
-        content: groqReply,
-        time: Date.now()
-      });
+      try {
+        const groqReply = await askGroq();
+        messages.push({ role: "ai", name: "Groq", content: groqReply, time: Date.now() });
+      } catch (err) {
+        messages.push({ role: "system", name: "Tizim", content: err.message, time: Date.now() });
+      }
     }
 
     if (messages.length > 100) {
       messages = messages.slice(-100);
     }
-  } catch (err) {
-    messages.push({
-      role: "system",
-      name: "Tizim",
-      content: "Xatolik: " + err.message,
-      time: Date.now()
-    });
   } finally {
     busy = false;
   }
 }
 
-app.get("/api/messages", (req, res) => {
-  res.json({ messages, busy });
-});
+app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
 app.get("/api/config", (req, res) => {
   res.json({
@@ -176,6 +176,4 @@ app.post("/api/clear", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`AI Suhbat serveri ${PORT}-portda ishga tushdi`);
-});
+app.listen(PORT, () => console.log(`AI Suhbat serveri ${PORT}-portda ishga tushdi`));
