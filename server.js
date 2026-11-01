@@ -198,35 +198,77 @@ async function runConversationRound() {
 }
 
 // ==========================================================
-// ALOHIDA GROQ OVOZLI SUHBAT FUNKSIYALARI (GEMINI ARALASHMAYDI)
+// ALOHIDA GROQ OVOZLI SUHBAT FUNKSIYALARI (ANIQ O'ZBEKCHA STT)
 // ==========================================================
 
-async function transcribeWithGroq(buffer, mimetype, originalname) {
-  const whisperModels = ["whisper-large-v3-turbo", "whisper-large-v3"];
-  let lastErr = "";
+async function transcribeUzbekVoice(buffer, mimetype, originalname) {
+  const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
-  for (const wModel of whisperModels) {
-    const form = new FormData();
-    const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : "webm";
-    const blob = new Blob([buffer], { type: mimetype || "audio/webm" });
-    form.append("file", blob, `voice.${ext}`);
-    form.append("model", wModel);
-    form.append("language", "uz");
+  // 1-BOSQICH: O'zbekcha nutqni eng aniq tushunadigan Multimodal STT (orqa fonda faqat ovozni matnga o'girish uchun)
+  if (GEMINI_KEY) {
+    const base64Audio = buffer.toString("base64");
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: cleanMime,
+                    data: base64Audio
+                  }
+                },
+                {
+                  text: "Ushbu audiodagi inson nutqini eshitib, aynan nima deganini o'zbek tilida (lotin alifbosida) so'zma-so'z yozib ber. Hech qanday qo'shimcha izoh yozma, savolga javob berma, faqat eshitilgan gapning o'zini yoz. Agar audioda hech qanday gap bo'lmasa yoki faqat shovqin bo'lsa, BO'SH deb yoz."
+                }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.0,
+              maxOutputTokens: 300
+            }
+          })
+        });
 
-    const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${GROQ_KEY}` },
-      body: form
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return (data.text || "").trim();
-    } else {
-      lastErr = await res.text();
+        if (res.ok) {
+          const data = await res.json();
+          const parts = data?.candidates?.[0]?.content?.parts || [];
+          const text = parts.map(p => p.text || "").join("").trim();
+          if (text && !/^bo['‘`]?sh$/i.test(text)) {
+            return text.replace(/^["']|["']$/g, "").trim();
+          }
+        }
+      } catch (e) {}
     }
   }
-  throw new Error(`Groq Whisper xatosi: ${lastErr.slice(0, 120)}`);
+
+  // 2-BOSQICH: Groq Whisper-large-v3 (turbo emas, chunki turbo o'zbek tilini buzadi)
+  const form = new FormData();
+  const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
+  const blob = new Blob([buffer], { type: cleanMime });
+  form.append("file", blob, `voice.${ext}`);
+  form.append("model", "whisper-large-v3");
+  form.append("language", "uz");
+  form.append("temperature", "0");
+  form.append("prompt", "Assalomu alaykum! Bu o'zbek tilidagi jonli suhbat. Salom, qalaysiz, yaxshimisiz, nima gaplar, menga yordam bering.");
+
+  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${GROQ_KEY}` },
+    body: form
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    return (data.text || "").trim();
+  } else {
+    const errText = await res.text();
+    throw new Error(`Ovozni aniqlash xatosi: ${errText.slice(0, 120)}`);
+  }
 }
 
 async function askGroqVoiceOnly(userText) {
@@ -250,12 +292,12 @@ async function askGroqVoiceOnly(userText) {
         messages: [
           {
             role: "system",
-            content: "Sen Groq ovozli sun'iy intellektisan. Foydalanuvchi bilan yuzma-yuz ovozli gaplashyapsan. Faqat o'zbek tilida, juda tabiiy, samimiy va qisqa (1-3 gap) javob qaytar. Hech qanday maxsus belgilar (*, #) ishlatma, chunki javobing ovozli o'qib eshittiriladi."
+            content: "Sen Groq ovozli sun'iy intellektisan. Foydalanuvchi bilan yuzma-yuz ovozli gaplashyapsan. Faqat sof va ravon o'zbek tilida (lotin alifbosida), juda tabiiy, samimiy va qisqa (1-3 gap) javob qaytar. Hech qanday maxsus belgilar (*, #) ishlatma, chunki javobing ovozli o'qib eshittiriladi."
           },
           ...history,
           { role: "user", content: userText }
         ],
-        temperature: 0.75,
+        temperature: 0.7,
         max_tokens: 450
       })
     });
@@ -277,7 +319,6 @@ async function askGroqVoiceOnly(userText) {
 }
 
 async function synthesizeSpeechServer(text, voiceGender = "male") {
-  // 1. Agar ElevenLabs API kaliti bo'lsa, undan foydalanadi
   if (ELEVENLABS_KEY) {
     try {
       const voiceId = "21m00Tcm4TlvDq8ikWAM";
@@ -300,7 +341,6 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
     } catch (e) {}
   }
 
-  // 2. Microsoft Edge Neural O'zbekcha ovozi (SardorNeural yoki MadinaNeural - haqiqiy jonli ovoz, kalit shart emas)
   try {
     const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
     const tts = new MsEdgeTTS();
@@ -365,7 +405,6 @@ app.post("/api/clear", (req, res) => {
   res.json({ ok: true });
 });
 
-// Alohida Groq Ovozli suhbat endpointlari
 app.get("/api/voice/messages", (req, res) => {
   res.json({ messages: voiceMessages });
 });
@@ -385,10 +424,17 @@ app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
 
   try {
     const voiceGender = req.body?.voice || "male";
-    const userText = await transcribeWithGroq(req.file.buffer, req.file.mimetype, req.file.originalname);
+    const clientTranscript = String(req.body?.transcript || "").trim();
+
+    let userText = "";
+    if (clientTranscript.length > 1) {
+      userText = clientTranscript;
+    } else {
+      userText = await transcribeUzbekVoice(req.file.buffer, req.file.mimetype, req.file.originalname);
+    }
 
     if (!userText) {
-      return res.status(400).json({ error: "Ovozingiz eshitilmadi, iltimos qaytadan gapiring." });
+      return res.status(400).json({ error: "Ovozingiz eshitilmadi, iltimos aniqroq gapiring." });
     }
 
     const userMsg = { role: "user", name: "Siz", content: userText, time: Date.now() };
