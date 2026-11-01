@@ -1,7 +1,7 @@
 {
   "name": "ai-suhbat",
-  "version": "1.3.0",
-  "description": "Telegram Mini App - Gemini va Groq erkin suhbat xonasi",
+  "version": "1.4.0",
+  "description": "Telegram Mini App - Gemini va Groq erkin suhbat xonasi + Groq Ovozli suhbat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,6 +10,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "msedge-tts": "^2.0.4"
   }
 }

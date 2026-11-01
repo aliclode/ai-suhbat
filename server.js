@@ -1,15 +1,23 @@
 const express = require("express");
 const path = require("path");
+const multer = require("multer");
 const app = express();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 let messages = [];
+let voiceMessages = [];
 let busy = false;
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const GROQ_KEY = process.env.GROQ_API_KEY || "";
+const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY || "";
 
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
@@ -44,16 +52,13 @@ async function getAvailableGroqModels() {
       const available = (data.data || [])
         .map(m => m.id)
         .filter(id => !/whisper|tts|guard|embed|vision|orpheus|playai|allam/i.test(id));
-      
-      // Avval preferred ichidan mavjudlarini, keyin qolgan barcha chat modellarini tartiblaymiz
+
       const matched = preferred.filter(p => available.includes(p));
       const others = available.filter(a => !matched.includes(a));
       const combined = [...new Set([...matched, ...others])];
       if (combined.length > 0) return combined;
     }
-  } catch (e) {
-    // Tarmoq xatosi bo'lsa preferred ro'yxatidan foydalanamiz
-  }
+  } catch (e) {}
   return [...new Set(preferred)];
 }
 
@@ -192,6 +197,133 @@ async function runConversationRound() {
   }
 }
 
+// ==========================================================
+// ALOHIDA GROQ OVOZLI SUHBAT FUNKSIYALARI (GEMINI ARALASHMAYDI)
+// ==========================================================
+
+async function transcribeWithGroq(buffer, mimetype, originalname) {
+  const whisperModels = ["whisper-large-v3-turbo", "whisper-large-v3"];
+  let lastErr = "";
+
+  for (const wModel of whisperModels) {
+    const form = new FormData();
+    const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : "webm";
+    const blob = new Blob([buffer], { type: mimetype || "audio/webm" });
+    form.append("file", blob, `voice.${ext}`);
+    form.append("model", wModel);
+    form.append("language", "uz");
+
+    const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${GROQ_KEY}` },
+      body: form
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return (data.text || "").trim();
+    } else {
+      lastErr = await res.text();
+    }
+  }
+  throw new Error(`Groq Whisper xatosi: ${lastErr.slice(0, 120)}`);
+}
+
+async function askGroqVoiceOnly(userText) {
+  const history = voiceMessages.slice(-10).map(m => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.content
+  }));
+
+  const modelsToTry = await getAvailableGroqModels();
+  let lastError = "";
+
+  for (const model of modelsToTry) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "Sen Groq ovozli sun'iy intellektisan. Foydalanuvchi bilan yuzma-yuz ovozli gaplashyapsan. Faqat o'zbek tilida, juda tabiiy, samimiy va qisqa (1-3 gap) javob qaytar. Hech qanday maxsus belgilar (*, #) ishlatma, chunki javobing ovozli o'qib eshittiriladi."
+          },
+          ...history,
+          { role: "user", content: userText }
+        ],
+        temperature: 0.75,
+        max_tokens: 450
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const reply = cleanReply(data?.choices?.[0]?.message?.content)
+        .replace(/[*#_`~]/g, "")
+        .trim();
+      if (reply) {
+        cachedGroqModel = model;
+        return reply;
+      }
+    } else {
+      lastError = await res.text();
+    }
+  }
+  throw new Error(`Groq javob xatosi: ${lastError.slice(0, 120)}`);
+}
+
+async function synthesizeSpeechServer(text, voiceGender = "male") {
+  // 1. Agar ElevenLabs API kaliti bo'lsa, undan foydalanadi
+  if (ELEVENLABS_KEY) {
+    try {
+      const voiceId = "21m00Tcm4TlvDq8ikWAM";
+      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: {
+          "Accept": "audio/mpeg",
+          "Content-Type": "application/json",
+          "xi-api-key": ELEVENLABS_KEY
+        },
+        body: JSON.stringify({
+          text,
+          model_id: "eleven_multilingual_v2"
+        })
+      });
+      if (res.ok) {
+        const arr = await res.arrayBuffer();
+        return Buffer.from(arr);
+      }
+    } catch (e) {}
+  }
+
+  // 2. Microsoft Edge Neural O'zbekcha ovozi (SardorNeural yoki MadinaNeural - haqiqiy jonli ovoz, kalit shart emas)
+  try {
+    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+    const tts = new MsEdgeTTS();
+    const voiceName = voiceGender === "female" ? "uz-UZ-MadinaNeural" : "uz-UZ-SardorNeural";
+    await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioStream } = tts.toStream(text);
+    const chunks = [];
+    for await (const chunk of audioStream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const finalBuf = Buffer.concat(chunks);
+    if (finalBuf.length > 0) return finalBuf;
+  } catch (err) {
+    console.error("Edge TTS xatosi:", err.message);
+  }
+
+  throw new Error("Ovoz sintez qilishda xatolik yuz berdi.");
+}
+
+// ==========================================================
+// API ENDPOINTLAR
+// ==========================================================
+
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
 app.get("/api/config", (req, res) => {
@@ -231,6 +363,55 @@ app.post("/api/clear", (req, res) => {
   if (busy) return res.status(429).json({ error: "AI'lar javob yozib bo'lishini kuting." });
   messages = [];
   res.json({ ok: true });
+});
+
+// Alohida Groq Ovozli suhbat endpointlari
+app.get("/api/voice/messages", (req, res) => {
+  res.json({ messages: voiceMessages });
+});
+
+app.post("/api/voice/clear", (req, res) => {
+  voiceMessages = [];
+  res.json({ ok: true });
+});
+
+app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
+  if (!GROQ_KEY) {
+    return res.status(400).json({ error: "Serverda GROQ_API_KEY sozlanmagan." });
+  }
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: "Ovozli fayl yetib kelmadi." });
+  }
+
+  try {
+    const voiceGender = req.body?.voice || "male";
+    const userText = await transcribeWithGroq(req.file.buffer, req.file.mimetype, req.file.originalname);
+
+    if (!userText) {
+      return res.status(400).json({ error: "Ovozingiz eshitilmadi, iltimos qaytadan gapiring." });
+    }
+
+    const userMsg = { role: "user", name: "Siz", content: userText, time: Date.now() };
+    voiceMessages.push(userMsg);
+
+    const replyText = await askGroqVoiceOnly(userText);
+    const aiMsg = { role: "ai", name: "Groq", content: replyText, time: Date.now() };
+    voiceMessages.push(aiMsg);
+
+    if (voiceMessages.length > 60) {
+      voiceMessages = voiceMessages.slice(-60);
+    }
+
+    const audioBuffer = await synthesizeSpeechServer(replyText, voiceGender);
+
+    res.json({
+      userMessage: userMsg,
+      aiMessage: aiMsg,
+      audioBase64: audioBuffer.toString("base64")
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Ovozli muloqotda xatolik" });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
