@@ -40,7 +40,7 @@ function esc(s) {
 }
 
 function cssName(m) {
-  if (m.role === "human") return "human";
+  if (m.role === "human" || m.role === "user") return "human";
   if (m.role === "system") return "system";
   const map = { Gemini: "gemini", Groq: "groq" };
   return map[m.name] || "system";
@@ -166,6 +166,194 @@ input.addEventListener("keydown", e => {
     form.requestSubmit();
   }
 });
+
+// ==========================================================
+// ALOHIDA GROQ OVOZLI SUHBAT LOGIKASI
+// ==========================================================
+
+const openVoiceBtn = document.getElementById("open-voice");
+const closeVoiceBtn = document.getElementById("close-voice");
+const voiceModal = document.getElementById("voice-modal");
+const voiceFeed = document.getElementById("voice-feed");
+const micBtn = document.getElementById("mic-btn");
+const voiceStatus = document.getElementById("voice-status");
+const voiceClearBtn = document.getElementById("voice-clear");
+const voiceGenderSelect = document.getElementById("voice-gender");
+
+let voiceList = [];
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let isProcessingVoice = false;
+let currentAudio = null;
+
+const VOICE_WELCOME = `<div class="welcome"><strong>Groq bilan yakkama-yakka ovozli suhbat!</strong><br>Pastdagi mikrofon tugmasini bir marta bosib gapiring, tugatgach yana bosing. Gemini bu suhbatga aralashmaydi.</div>`;
+
+function renderVoiceFeed() {
+  if (!voiceList.length) {
+    voiceFeed.innerHTML = VOICE_WELCOME;
+    return;
+  }
+  voiceFeed.innerHTML = voiceList.map(m => `
+    <article class="msg ${cssName(m)}">
+      <div class="name">${esc(m.name)}</div>
+      <div class="content">${esc(m.content)}</div>
+      <div class="time">${new Date(m.time).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}</div>
+    </article>
+  `).join("");
+  voiceFeed.scrollTop = voiceFeed.scrollHeight;
+}
+
+async function loadVoiceHistory() {
+  try {
+    const r = await fetch("/api/voice/messages");
+    const d = await r.json();
+    voiceList = d.messages || [];
+    renderVoiceFeed();
+  } catch (e) {}
+}
+
+openVoiceBtn.addEventListener("click", () => {
+  voiceModal.hidden = false;
+  loadVoiceHistory();
+});
+
+closeVoiceBtn.addEventListener("click", () => {
+  if (isRecording && mediaRecorder) {
+    mediaRecorder.stop();
+    isRecording = false;
+  }
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  voiceModal.hidden = true;
+});
+
+voiceClearBtn.addEventListener("click", async () => {
+  if (isProcessingVoice) return;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  await fetch("/api/voice/clear", { method: "POST" });
+  voiceList = [];
+  renderVoiceFeed();
+  voiceStatus.textContent = "Suhbat tozalandi. Mikrofonni bosing";
+});
+
+function getSupportedMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  for (const t of types) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return "";
+}
+
+async function startMicRecording() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+    micBtn.classList.remove("speaking");
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = getSupportedMimeType();
+    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const finalMime = mediaRecorder.mimeType || "audio/webm";
+      const ext = finalMime.includes("mp4") ? "m4a" : "webm";
+      const blob = new Blob(audioChunks, { type: finalMime });
+      if (blob.size < 400) {
+        voiceStatus.textContent = "Ovoz juda qisqa bo‘ldi, qaytadan gapiring";
+        return;
+      }
+      await sendVoiceToGroq(blob, ext);
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    micBtn.classList.add("recording");
+    voiceStatus.textContent = "🔴 Eshitilmoqda... Gapirib bo‘lgach tugmani bosing";
+  } catch (err) {
+    alert("Mikrofonga ruxsat berilmadi. Telegram ichida mikrofonga ruxsat bering.");
+  }
+}
+
+function stopMicRecording() {
+  if (mediaRecorder && isRecording) {
+    isRecording = false;
+    micBtn.classList.remove("recording");
+    mediaRecorder.stop();
+  }
+}
+
+micBtn.addEventListener("click", () => {
+  if (isProcessingVoice) return;
+  if (!isRecording) {
+    startMicRecording();
+  } else {
+    stopMicRecording();
+  }
+});
+
+async function sendVoiceToGroq(blob, ext) {
+  isProcessingVoice = true;
+  micBtn.disabled = true;
+  voiceStatus.textContent = "⏳ Groq eshitmoqda va ovoz tayyorlamoqda…";
+
+  try {
+    const formData = new FormData();
+    formData.append("audio", blob, `voice.${ext}`);
+    formData.append("voice", voiceGenderSelect.value);
+
+    const res = await fetch("/api/voice/talk", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Xatolik yuz berdi");
+    }
+
+    voiceList.push(data.userMessage);
+    voiceList.push(data.aiMessage);
+    renderVoiceFeed();
+
+    // Serverdan kelgan tabiiy Neural MP3 ovozni o'qitish
+    const bytes = Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0));
+    const audioBlob = new Blob([bytes], { type: "audio/mpeg" });
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    currentAudio = new Audio(audioUrl);
+    micBtn.classList.add("speaking");
+    voiceStatus.textContent = "🔊 Groq gapirmoqda…";
+
+    currentAudio.onended = () => {
+      micBtn.classList.remove("speaking");
+      voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
+    };
+    currentAudio.onerror = () => {
+      micBtn.classList.remove("speaking");
+      voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
+    };
+
+    await currentAudio.play();
+  } catch (err) {
+    voiceStatus.textContent = "Xato: " + err.message;
+  } finally {
+    isProcessingVoice = false;
+    micBtn.disabled = false;
+  }
+}
 
 loadConfig();
 refresh();

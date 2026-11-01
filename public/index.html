@@ -39,6 +39,7 @@
 
     <div class="actions">
       <button id="debate" class="secondary" type="button" disabled>↻ AI'lar o‘zaro davom ettirsin</button>
+      <button id="open-voice" class="secondary voice-open-btn" type="button">🎙 Groq Ovozli</button>
       <button id="clear" class="secondary clear-btn" type="button" title="Suhbatni tozalash" disabled>✕ Tozalash</button>
       <span id="hint">Avval mavzu yozing</span>
     </div>
@@ -53,6 +54,45 @@
       <span>Erkin suhbat xonasi</span>
     </footer>
   </main>
+
+  <!-- ALOHIDA GROQ OVOZLI SUHBAT OYNASI (MODAL) -->
+  <div id="voice-modal" class="voice-modal" hidden>
+    <div class="voice-modal-inner">
+      <header class="voice-header">
+        <div>
+          <div class="eyebrow">ALOHIDA OVOZLI REJIM</div>
+          <h2>◉ Groq Ovozli Suhbat</h2>
+        </div>
+        <button id="close-voice" class="secondary close-voice-btn" type="button">✕ Yopish</button>
+      </header>
+
+      <div class="voice-controls-top">
+        <label class="voice-select-label">
+          Groq ovozi:
+          <select id="voice-gender" class="voice-select">
+            <option value="male">Sardor (Erkak · Neural)</option>
+            <option value="female">Madina (Ayol · Neural)</option>
+          </select>
+        </label>
+        <button id="voice-clear" class="secondary clear-btn" type="button">Tozalash</button>
+      </div>
+
+      <section id="voice-feed" class="feed voice-feed" aria-live="polite">
+        <div class="welcome">
+          <strong>Groq bilan yakkama-yakka ovozli suhbat!</strong><br>
+          Pastdagi mikrofon tugmasini bir marta bosib gapiring, tugatgach yana bosing. Gemini bu suhbatga aralashmaydi.
+        </div>
+      </section>
+
+      <div class="voice-mic-area">
+        <button id="mic-btn" class="mic-btn" type="button" aria-label="Mikrofon">
+          🎙
+        </button>
+        <div id="voice-status" class="voice-status">Gapirish uchun mikrofonni bosing</div>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
