@@ -199,9 +199,14 @@ async function runConversationRound() {
   }
 }
 
+// ==========================================================
+// MUKAMMAL O'ZBEKCHA OVOZNI MATNGA O'GIRISH (STT)
+// ==========================================================
+
 async function transcribeUzbekVoice(buffer, mimetype, originalname) {
   const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
+  // 1-BOSQICH: Gemini Multimodal (O'zbek tilidagi shevalar va nutqni mukammal tushunadi)
   if (GEMINI_KEY) {
     const base64Audio = buffer.toString("base64");
     for (const model of GEMINI_MODELS) {
@@ -220,13 +225,13 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
                   }
                 },
                 {
-                  text: "Ushbu audiodagi inson nutqini eshitib, aynan nima deganini o'zbek tilida (lotin alifbosida) so'zma-so'z yozib ber. Hech qanday qo'shimcha izoh yozma, savolga javob berma, faqat eshitilgan gapning o'zini yoz. Agar audioda hech qanday gap bo'lmasa yoki faqat shovqin bo'lsa, BO'SH deb yoz."
+                  text: "Ushbu audiodagi inson nutqini tinglab, uning o'zbek tilida aytgan gaplarini aynan o'zini lotin alifbosida xatosiz matnga o'girib yoz. Hech qanday qo'shimcha izoh yozma, tarjima qilma, faqat eshitilgan gapning o'zini yoz. Agar ovoz yoki ma'no bo'lmasa, BO'SH deb yoz."
                 }
               ]
             }],
             generationConfig: {
               temperature: 0.0,
-              maxOutputTokens: 300
+              maxOutputTokens: 400
             }
           })
         });
@@ -243,6 +248,7 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     }
   }
 
+  // 2-BOSQICH: Groq Whisper-large-v3 (Zahira uchun)
   if (GROQ_KEY) {
     const form = new FormData();
     const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
@@ -251,7 +257,7 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     form.append("model", "whisper-large-v3");
     form.append("language", "uz");
     form.append("temperature", "0");
-    form.append("prompt", "Assalomu alaykum! Bu o'zbek tilidagi jonli suhbat. Salom, qalaysiz, yaxshimisiz, nima gaplar, menga yordam bering.");
+    form.append("prompt", "Assalomu alaykum! Bu o'zbek tilidagi jonli suhbat. Salom, qalaysiz, yaxshimisiz, nima gaplar, sun'iy intellekt, yordam bering.");
 
     const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
@@ -265,7 +271,7 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     }
   }
 
-  throw new Error("Ovozni aniqlash uchun ishlaydigan model topilmadi.");
+  throw new Error("Ovozni aniqlash imkoni bo'lmadi.");
 }
 
 async function askGroqVoiceOnly(userText) {

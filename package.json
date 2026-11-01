@@ -1,7 +1,7 @@
 {
   "name": "ai-suhbat",
-  "version": "1.6.0",
-  "description": "Telegram Mini App - Gemini va Groq erkin suhbat + Alohida Gemini va Groq Ovozli suhbatlar",
+  "version": "1.7.0",
+  "description": "Telegram Mini App - Gemini va Groq erkin suhbat + Alohida Gemini va Groq Ovozli suhbatlar (Mukammal STT)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
