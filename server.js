@@ -206,7 +206,6 @@ async function runConversationRound() {
 async function transcribeUzbekVoice(buffer, mimetype, originalname) {
   const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
-  // 1-BOSQICH: Gemini Multimodal (O'zbek tilidagi shevalar va nutqni mukammal tushunadi)
   if (GEMINI_KEY) {
     const base64Audio = buffer.toString("base64");
     for (const model of GEMINI_MODELS) {
@@ -248,7 +247,6 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     }
   }
 
-  // 2-BOSQICH: Groq Whisper-large-v3 (Zahira uchun)
   if (GROQ_KEY) {
     const form = new FormData();
     const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
@@ -383,7 +381,8 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
       });
       if (res.ok) {
         const arr = await res.arrayBuffer();
-        return Buffer.from(arr);
+        const buf = Buffer.from(arr);
+        if (buf.length > 100) return buf;
       }
     } catch (e) {}
   }
