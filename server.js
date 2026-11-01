@@ -24,9 +24,9 @@ const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY || "";
 
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
-  "gemini-2.5-flash-lite",
   "gemini-flash-latest",
-  "gemini-2.0-flash"
+  "gemini-2.5-flash-lite",
+  "gemini-3-flash-preview"
 ].filter(Boolean);
 
 let cachedGroqModel = "";
@@ -40,7 +40,6 @@ async function getAvailableGroqModels() {
     "meta-llama/llama-4-scout-17b-16e-instruct",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
     "qwen-qwq-32b",
-    "qwen/qwen3-32b",
     "gemma2-9b-it",
     "llama3-8b-8192",
     "llama3-70b-8192"
@@ -200,14 +199,9 @@ async function runConversationRound() {
   }
 }
 
-// ==========================================================
-// ALOHIDA OVOZLI SUHBAT FUNKSIYALARI (GEMINI VA GROQ UCHUN)
-// ==========================================================
-
 async function transcribeUzbekVoice(buffer, mimetype, originalname) {
   const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
-  // 1-BOSQICH: O'zbekcha nutqni eng aniq tushunadigan Multimodal STT
   if (GEMINI_KEY) {
     const base64Audio = buffer.toString("base64");
     for (const model of GEMINI_MODELS) {
@@ -249,7 +243,6 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     }
   }
 
-  // 2-BOSQICH: Groq Whisper-large-v3 zahira sifatida
   if (GROQ_KEY) {
     const form = new FormData();
     const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
@@ -269,13 +262,10 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     if (res.ok) {
       const data = await res.json();
       return (data.text || "").trim();
-    } else {
-      const errText = await res.text();
-      throw new Error(`Ovozni aniqlash xatosi: ${errText.slice(0, 120)}`);
     }
   }
 
-  throw new Error("Ovozni aniqlash uchun API kalit topilmadi.");
+  throw new Error("Ovozni aniqlash uchun ishlaydigan model topilmadi.");
 }
 
 async function askGroqVoiceOnly(userText) {
@@ -299,7 +289,7 @@ async function askGroqVoiceOnly(userText) {
         messages: [
           {
             role: "system",
-            content: "Sen Groq ovozli sun'iy intellektisan. Foydalanuvchi bilan yuzma-yuz ovozli gaplashyapsan. Faqat sof va ravon o'zbek tilida (lotin alifbosida), juda tabiiy, samimiy va qisqa (1-3 gap) javob qaytar. Hech qanday maxsus belgilar (*, #) ishlatma, chunki javobing ovozli o'qib eshittiriladi."
+            content: "Sen Groq ovozli sun'iy intellektisan. Foydalanuvchi bilan yuzma-yuz ovozli gaplashyapsan. Faqat sof va ravon o'zbek tilida (lotin alifbosida), juda tabiiy, samimiy va qisqa (1-3 gap) javob qaytar. Hech qanday maxsus belgilar (*, #) ishlatma."
           },
           ...history,
           { role: "user", content: userText }
@@ -333,7 +323,7 @@ async function askGeminiVoiceOnly(userText) {
     `Qoidalar:`,
     `1. Faqat sof va ravon o'zbek tilida (lotin alifbosida), tabiiy va samimiy javob qaytar.`,
     `2. Javobing qisqa, aniq va tugallangan bo'lsin (1-3 gap).`,
-    `3. Hech qanday maxsus formatlash belgilari (*, #, -) ishlatma, chunki javobing ovozli o'qib eshittiriladi.`,
+    `3. Hech qanday maxsus formatlash belgilari (*, #, -) ishlatma.`,
     ``,
     recent ? `Avvalgi suhbat:\n${recent}\n` : "",
     `Foydalanuvchi: ${userText}`,
@@ -404,16 +394,10 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
     }
     const finalBuf = Buffer.concat(chunks);
     if (finalBuf.length > 0) return finalBuf;
-  } catch (err) {
-    console.error("Edge TTS xatosi:", err.message);
-  }
+  } catch (err) {}
 
   throw new Error("Ovoz sintez qilishda xatolik yuz berdi.");
 }
-
-// ==========================================================
-// API ENDPOINTLAR
-// ==========================================================
 
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
