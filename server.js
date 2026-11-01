@@ -12,7 +12,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 let messages = [];
-let voiceMessages = [];
+let voiceHistories = {
+  groq: [],
+  gemini: []
+};
 let busy = false;
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
@@ -198,13 +201,13 @@ async function runConversationRound() {
 }
 
 // ==========================================================
-// ALOHIDA GROQ OVOZLI SUHBAT FUNKSIYALARI (ANIQ O'ZBEKCHA STT)
+// ALOHIDA OVOZLI SUHBAT FUNKSIYALARI (GEMINI VA GROQ UCHUN)
 // ==========================================================
 
 async function transcribeUzbekVoice(buffer, mimetype, originalname) {
   const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
-  // 1-BOSQICH: O'zbekcha nutqni eng aniq tushunadigan Multimodal STT (orqa fonda faqat ovozni matnga o'girish uchun)
+  // 1-BOSQICH: O'zbekcha nutqni eng aniq tushunadigan Multimodal STT
   if (GEMINI_KEY) {
     const base64Audio = buffer.toString("base64");
     for (const model of GEMINI_MODELS) {
@@ -246,33 +249,37 @@ async function transcribeUzbekVoice(buffer, mimetype, originalname) {
     }
   }
 
-  // 2-BOSQICH: Groq Whisper-large-v3 (turbo emas, chunki turbo o'zbek tilini buzadi)
-  const form = new FormData();
-  const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
-  const blob = new Blob([buffer], { type: cleanMime });
-  form.append("file", blob, `voice.${ext}`);
-  form.append("model", "whisper-large-v3");
-  form.append("language", "uz");
-  form.append("temperature", "0");
-  form.append("prompt", "Assalomu alaykum! Bu o'zbek tilidagi jonli suhbat. Salom, qalaysiz, yaxshimisiz, nima gaplar, menga yordam bering.");
+  // 2-BOSQICH: Groq Whisper-large-v3 zahira sifatida
+  if (GROQ_KEY) {
+    const form = new FormData();
+    const ext = (originalname && originalname.includes(".")) ? originalname.split(".").pop() : (cleanMime.includes("mp4") ? "m4a" : "webm");
+    const blob = new Blob([buffer], { type: cleanMime });
+    form.append("file", blob, `voice.${ext}`);
+    form.append("model", "whisper-large-v3");
+    form.append("language", "uz");
+    form.append("temperature", "0");
+    form.append("prompt", "Assalomu alaykum! Bu o'zbek tilidagi jonli suhbat. Salom, qalaysiz, yaxshimisiz, nima gaplar, menga yordam bering.");
 
-  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${GROQ_KEY}` },
-    body: form
-  });
+    const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${GROQ_KEY}` },
+      body: form
+    });
 
-  if (res.ok) {
-    const data = await res.json();
-    return (data.text || "").trim();
-  } else {
-    const errText = await res.text();
-    throw new Error(`Ovozni aniqlash xatosi: ${errText.slice(0, 120)}`);
+    if (res.ok) {
+      const data = await res.json();
+      return (data.text || "").trim();
+    } else {
+      const errText = await res.text();
+      throw new Error(`Ovozni aniqlash xatosi: ${errText.slice(0, 120)}`);
+    }
   }
+
+  throw new Error("Ovozni aniqlash uchun API kalit topilmadi.");
 }
 
 async function askGroqVoiceOnly(userText) {
-  const history = voiceMessages.slice(-10).map(m => ({
+  const history = voiceHistories.groq.slice(-10).map(m => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.content
   }));
@@ -316,6 +323,50 @@ async function askGroqVoiceOnly(userText) {
     }
   }
   throw new Error(`Groq javob xatosi: ${lastError.slice(0, 120)}`);
+}
+
+async function askGeminiVoiceOnly(userText) {
+  const recent = voiceHistories.gemini.slice(-10).map(m => `${m.name}: ${m.content}`).join("\n");
+  const prompt = [
+    `Sen Google tomonidan yaratilgan "Gemini" nomli aqlli va samimiy ovozli sun'iy intellektsan.`,
+    `Foydalanuvchi bilan yakkama-yakka jonli ovozda suhbatlashyapsan (bu yerda boshqa AI yo'q).`,
+    `Qoidalar:`,
+    `1. Faqat sof va ravon o'zbek tilida (lotin alifbosida), tabiiy va samimiy javob qaytar.`,
+    `2. Javobing qisqa, aniq va tugallangan bo'lsin (1-3 gap).`,
+    `3. Hech qanday maxsus formatlash belgilari (*, #, -) ishlatma, chunki javobing ovozli o'qib eshittiriladi.`,
+    ``,
+    recent ? `Avvalgi suhbat:\n${recent}\n` : "",
+    `Foydalanuvchi: ${userText}`,
+    `Gemini javobi:`
+  ].filter(Boolean).join("\n");
+
+  let lastError = "";
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.75,
+          maxOutputTokens: 800
+        }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const reply = cleanReply(parts.map(p => p.text || "").join(""))
+        .replace(/[*#_`~]/g, "")
+        .trim();
+      if (reply) return reply;
+    } else {
+      lastError = await res.text();
+    }
+  }
+  throw new Error(`Gemini javob xatosi: ${lastError.slice(0, 120)}`);
 }
 
 async function synthesizeSpeechServer(text, voiceGender = "male") {
@@ -406,16 +457,23 @@ app.post("/api/clear", (req, res) => {
 });
 
 app.get("/api/voice/messages", (req, res) => {
-  res.json({ messages: voiceMessages });
+  const target = req.query.target === "gemini" ? "gemini" : "groq";
+  res.json({ messages: voiceHistories[target] || [] });
 });
 
 app.post("/api/voice/clear", (req, res) => {
-  voiceMessages = [];
+  const target = req.body?.target === "gemini" ? "gemini" : "groq";
+  voiceHistories[target] = [];
   res.json({ ok: true });
 });
 
 app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
-  if (!GROQ_KEY) {
+  const target = req.body?.target === "gemini" ? "gemini" : "groq";
+
+  if (target === "gemini" && !GEMINI_KEY) {
+    return res.status(400).json({ error: "Serverda GEMINI_API_KEY sozlanmagan." });
+  }
+  if (target === "groq" && !GROQ_KEY) {
     return res.status(400).json({ error: "Serverda GROQ_API_KEY sozlanmagan." });
   }
   if (!req.file || !req.file.buffer) {
@@ -423,29 +481,26 @@ app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
   }
 
   try {
-    const voiceGender = req.body?.voice || "male";
-    const clientTranscript = String(req.body?.transcript || "").trim();
-
-    let userText = "";
-    if (clientTranscript.length > 1) {
-      userText = clientTranscript;
-    } else {
-      userText = await transcribeUzbekVoice(req.file.buffer, req.file.mimetype, req.file.originalname);
-    }
+    const voiceGender = req.body?.voice || (target === "gemini" ? "female" : "male");
+    const userText = await transcribeUzbekVoice(req.file.buffer, req.file.mimetype, req.file.originalname);
 
     if (!userText) {
       return res.status(400).json({ error: "Ovozingiz eshitilmadi, iltimos aniqroq gapiring." });
     }
 
     const userMsg = { role: "user", name: "Siz", content: userText, time: Date.now() };
-    voiceMessages.push(userMsg);
+    voiceHistories[target].push(userMsg);
 
-    const replyText = await askGroqVoiceOnly(userText);
-    const aiMsg = { role: "ai", name: "Groq", content: replyText, time: Date.now() };
-    voiceMessages.push(aiMsg);
+    const replyText = target === "gemini"
+      ? await askGeminiVoiceOnly(userText)
+      : await askGroqVoiceOnly(userText);
 
-    if (voiceMessages.length > 60) {
-      voiceMessages = voiceMessages.slice(-60);
+    const aiName = target === "gemini" ? "Gemini" : "Groq";
+    const aiMsg = { role: "ai", name: aiName, content: replyText, time: Date.now() };
+    voiceHistories[target].push(aiMsg);
+
+    if (voiceHistories[target].length > 60) {
+      voiceHistories[target] = voiceHistories[target].slice(-60);
     }
 
     const audioBuffer = await synthesizeSpeechServer(replyText, voiceGender);
