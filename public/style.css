@@ -162,6 +162,11 @@ p {
   font-weight: 600;
   font-size: 12px;
 }
+.gemini-voice-btn {
+  background: linear-gradient(135deg, #1f3b63, #244b7a);
+  border-color: #5588c9;
+  color: #e6f2ff;
+}
 .voice-open-btn {
   background: linear-gradient(135deg, #3a2d5c, #27375c);
   border-color: #7d66b5;
@@ -217,7 +222,7 @@ footer {
   padding: 14px 3px 0;
 }
 
-/* GROQ OVOZLI MODAL DIZAYNI */
+/* OVOZLI MODAL DIZAYNI */
 .voice-modal[hidden] {
   display: none !important;
 }
@@ -250,6 +255,9 @@ footer {
   font-size: 21px;
   margin: 2px 0 0;
   color: #d6cbfc;
+}
+.voice-modal.gemini-mode .voice-header h2 {
+  color: #9ec8ff;
 }
 .voice-controls-top {
   display: flex;
@@ -300,17 +308,22 @@ footer {
   box-shadow: 0 6px 24px rgba(109, 85, 158, 0.45);
   transition: transform 0.18s ease, background 0.2s ease;
 }
+.voice-modal.gemini-mode .mic-btn {
+  border-color: #6aa6ed;
+  background: linear-gradient(135deg, #2b5fa6, #3d84d6);
+  box-shadow: 0 6px 24px rgba(74, 134, 212, 0.45);
+}
 .mic-btn:active {
   transform: scale(0.93);
 }
 .mic-btn.recording {
-  background: linear-gradient(135deg, #e05353, #b82c46);
-  border-color: #ff9494;
+  background: linear-gradient(135deg, #e05353, #b82c46) !important;
+  border-color: #ff9494 !important;
   animation: pulseMic 1.3s infinite;
 }
 .mic-btn.speaking {
-  background: linear-gradient(135deg, #329c7b, #28749c);
-  border-color: #79f2ce;
+  background: linear-gradient(135deg, #329c7b, #28749c) !important;
+  border-color: #79f2ce !important;
 }
 @keyframes pulseMic {
   0% { box-shadow: 0 0 0 0 rgba(224, 83, 83, 0.65); }

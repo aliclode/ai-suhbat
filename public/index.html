@@ -39,7 +39,8 @@
 
     <div class="actions">
       <button id="debate" class="secondary" type="button" disabled>↻ AI'lar o‘zaro davom ettirsin</button>
-      <button id="open-voice" class="secondary voice-open-btn" type="button">🎙 Groq Ovozli</button>
+      <button id="open-gemini-voice" class="secondary gemini-voice-btn" type="button">🎙 Gemini Ovozli</button>
+      <button id="open-groq-voice" class="secondary voice-open-btn" type="button">🎙 Groq Ovozli</button>
       <button id="clear" class="secondary clear-btn" type="button" title="Suhbatni tozalash" disabled>✕ Tozalash</button>
       <span id="hint">Avval mavzu yozing</span>
     </div>
@@ -55,20 +56,20 @@
     </footer>
   </main>
 
-  <!-- ALOHIDA GROQ OVOZLI SUHBAT OYNASI (MODAL) -->
+  <!-- ALOHIDA OVOZLI SUHBAT OYNASI (GEMINI YOKI GROQ UCHUN) -->
   <div id="voice-modal" class="voice-modal" hidden>
     <div class="voice-modal-inner">
       <header class="voice-header">
         <div>
-          <div class="eyebrow">ALOHIDA OVOZLI REJIM</div>
-          <h2>◉ Groq Ovozli Suhbat</h2>
+          <div id="voice-eyebrow" class="eyebrow">ALOHIDA OVOZLI REJIM</div>
+          <h2 id="voice-title">◉ Groq Ovozli Suhbat</h2>
         </div>
         <button id="close-voice" class="secondary close-voice-btn" type="button">✕ Yopish</button>
       </header>
 
       <div class="voice-controls-top">
         <label class="voice-select-label">
-          Groq ovozi:
+          Ovoz:
           <select id="voice-gender" class="voice-select">
             <option value="male">Sardor (Erkak · Neural)</option>
             <option value="female">Madina (Ayol · Neural)</option>
@@ -77,12 +78,7 @@
         <button id="voice-clear" class="secondary clear-btn" type="button">Tozalash</button>
       </div>
 
-      <section id="voice-feed" class="feed voice-feed" aria-live="polite">
-        <div class="welcome">
-          <strong>Groq bilan yakkama-yakka ovozli suhbat!</strong><br>
-          Pastdagi mikrofon tugmasini bir marta bosib gapiring, tugatgach yana bosing. Gemini bu suhbatga aralashmaydi.
-        </div>
-      </section>
+      <section id="voice-feed" class="feed voice-feed" aria-live="polite"></section>
 
       <div class="voice-mic-area">
         <button id="mic-btn" class="mic-btn" type="button" aria-label="Mikrofon">

@@ -168,18 +168,21 @@ input.addEventListener("keydown", e => {
 });
 
 // ==========================================================
-// ALOHIDA GROQ OVOZLI SUHBAT LOGIKASI
+// ALOHIDA OVOZLI SUHBAT LOGIKASI (GEMINI VA GROQ UCHUN)
 // ==========================================================
 
-const openVoiceBtn = document.getElementById("open-voice");
+const openGeminiVoiceBtn = document.getElementById("open-gemini-voice");
+const openGroqVoiceBtn = document.getElementById("open-groq-voice");
 const closeVoiceBtn = document.getElementById("close-voice");
 const voiceModal = document.getElementById("voice-modal");
+const voiceTitle = document.getElementById("voice-title");
 const voiceFeed = document.getElementById("voice-feed");
 const micBtn = document.getElementById("mic-btn");
 const voiceStatus = document.getElementById("voice-status");
 const voiceClearBtn = document.getElementById("voice-clear");
 const voiceGenderSelect = document.getElementById("voice-gender");
 
+let activeVoiceTarget = "groq"; // "groq" yoki "gemini"
 let voiceList = [];
 let mediaRecorder = null;
 let audioChunks = [];
@@ -187,11 +190,15 @@ let isRecording = false;
 let isProcessingVoice = false;
 let currentAudio = null;
 
-const VOICE_WELCOME = `<div class="welcome"><strong>Groq bilan yakkama-yakka ovozli suhbat!</strong><br>Pastdagi mikrofon tugmasini bir marta bosib gapiring, tugatgach yana bosing. Gemini bu suhbatga aralashmaydi.</div>`;
+function getVoiceWelcomeHtml() {
+  const aiTitle = activeVoiceTarget === "gemini" ? "Gemini" : "Groq";
+  const otherAi = activeVoiceTarget === "gemini" ? "Groq" : "Gemini";
+  return `<div class="welcome"><strong>${aiTitle} bilan yakkama-yakka ovozli suhbat!</strong><br>Pastdagi mikrofon tugmasini bir marta bosib gapiring, tugatgach yana bosing. ${otherAi} bu suhbatga aralashmaydi.</div>`;
+}
 
 function renderVoiceFeed() {
   if (!voiceList.length) {
-    voiceFeed.innerHTML = VOICE_WELCOME;
+    voiceFeed.innerHTML = getVoiceWelcomeHtml();
     return;
   }
   voiceFeed.innerHTML = voiceList.map(m => `
@@ -206,17 +213,31 @@ function renderVoiceFeed() {
 
 async function loadVoiceHistory() {
   try {
-    const r = await fetch("/api/voice/messages");
+    const r = await fetch(`/api/voice/messages?target=${activeVoiceTarget}`);
     const d = await r.json();
     voiceList = d.messages || [];
     renderVoiceFeed();
   } catch (e) {}
 }
 
-openVoiceBtn.addEventListener("click", () => {
+function openVoiceModal(target) {
+  activeVoiceTarget = target;
+  if (target === "gemini") {
+    voiceModal.classList.add("gemini-mode");
+    voiceTitle.textContent = "✦ Gemini Ovozli Suhbat";
+    voiceGenderSelect.value = "female";
+  } else {
+    voiceModal.classList.remove("gemini-mode");
+    voiceTitle.textContent = "◉ Groq Ovozli Suhbat";
+    voiceGenderSelect.value = "male";
+  }
+  voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
   voiceModal.hidden = false;
   loadVoiceHistory();
-});
+}
+
+openGeminiVoiceBtn.addEventListener("click", () => openVoiceModal("gemini"));
+openGroqVoiceBtn.addEventListener("click", () => openVoiceModal("groq"));
 
 closeVoiceBtn.addEventListener("click", () => {
   if (isRecording && mediaRecorder) {
@@ -227,6 +248,7 @@ closeVoiceBtn.addEventListener("click", () => {
     currentAudio.pause();
     currentAudio = null;
   }
+  micBtn.classList.remove("recording", "speaking");
   voiceModal.hidden = true;
 });
 
@@ -236,7 +258,11 @@ voiceClearBtn.addEventListener("click", async () => {
     currentAudio.pause();
     currentAudio = null;
   }
-  await fetch("/api/voice/clear", { method: "POST" });
+  await fetch("/api/voice/clear", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target: activeVoiceTarget })
+  });
   voiceList = [];
   renderVoiceFeed();
   voiceStatus.textContent = "Suhbat tozalandi. Mikrofonni bosing";
@@ -275,7 +301,7 @@ async function startMicRecording() {
         voiceStatus.textContent = "Ovoz juda qisqa bo‘ldi, qaytadan gapiring";
         return;
       }
-      await sendVoiceToGroq(blob, ext);
+      await sendVoiceToAI(blob, ext);
     };
 
     mediaRecorder.start();
@@ -304,15 +330,17 @@ micBtn.addEventListener("click", () => {
   }
 });
 
-async function sendVoiceToGroq(blob, ext) {
+async function sendVoiceToAI(blob, ext) {
   isProcessingVoice = true;
   micBtn.disabled = true;
-  voiceStatus.textContent = "⏳ Groq eshitmoqda va ovoz tayyorlamoqda…";
+  const aiLabel = activeVoiceTarget === "gemini" ? "Gemini" : "Groq";
+  voiceStatus.textContent = `⏳ ${aiLabel} eshitmoqda va ovoz tayyorlamoqda…`;
 
   try {
     const formData = new FormData();
     formData.append("audio", blob, `voice.${ext}`);
     formData.append("voice", voiceGenderSelect.value);
+    formData.append("target", activeVoiceTarget);
 
     const res = await fetch("/api/voice/talk", {
       method: "POST",
@@ -328,14 +356,13 @@ async function sendVoiceToGroq(blob, ext) {
     voiceList.push(data.aiMessage);
     renderVoiceFeed();
 
-    // Serverdan kelgan tabiiy Neural MP3 ovozni o'qitish
     const bytes = Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0));
     const audioBlob = new Blob([bytes], { type: "audio/mpeg" });
     const audioUrl = URL.createObjectURL(audioBlob);
 
     currentAudio = new Audio(audioUrl);
     micBtn.classList.add("speaking");
-    voiceStatus.textContent = "🔊 Groq gapirmoqda…";
+    voiceStatus.textContent = `🔊 ${aiLabel} gapirmoqda…`;
 
     currentAudio.onended = () => {
       micBtn.classList.remove("speaking");
