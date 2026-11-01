@@ -368,12 +368,16 @@ async function sendVoiceToAI(blob, ext) {
       micBtn.classList.remove("speaking");
       voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
     };
-    currentAudio.onerror = () => {
+    currentAudio.onerror = (e) => {
+      console.error("Audio ijro xatosi:", e);
       micBtn.classList.remove("speaking");
       voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
     };
 
-    await currentAudio.play();
+    await currentAudio.play().catch(err => {
+      console.log("Brauzer avtomatik ijroni chekladi:", err);
+      voiceStatus.textContent = "Ovozni eshitish uchun mikrofonni bosing";
+    });
   } catch (err) {
     voiceStatus.textContent = "Xato: " + err.message;
   } finally {
