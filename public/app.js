@@ -26,6 +26,25 @@ const hint = document.getElementById("hint");
 let lastSignature = "";
 let hasMessages = false;
 let busy = false;
+let appMode = "agent";
+const modeChatBtn = document.getElementById("mode-chat");
+const modeAgentBtn = document.getElementById("mode-agent");
+
+function setAppMode(mode) {
+  appMode = mode;
+  modeChatBtn.classList.toggle("mode-active", mode === "chat");
+  modeAgentBtn.classList.toggle("mode-active", mode === "agent");
+  document.querySelector(".agents").hidden = mode === "agent";
+  document.querySelector(".app .top p").textContent = mode === "agent"
+    ? "Topshiriq bering — NOVA AI uni tahlil qilib, reja va javob tayyorlaydi."
+    : "Gemini, Groq va Qwen erkin fikr almashadi. Siz ham suhbatga qo‘shiling.";
+  input.placeholder = mode === "agent" ? "NOVA AI ga topshiriq bering…" : "Suhbatga xabar yoki mavzu yozing…";
+  debate.hidden = mode === "agent";
+  hint.textContent = mode === "agent" ? "Agent rejimi faol" : "Suhbat rejimi faol";
+}
+
+modeChatBtn.addEventListener("click", () => setAppMode("chat"));
+modeAgentBtn.addEventListener("click", () => setAppMode("agent"));
 
 const WELCOME_HTML = `<div class="welcome"><strong>Xush kelibsiz!</strong><br>O‘rtaga biror mavzu yoki savol tashlang. Gemini va Groq navbat bilan javob beradi va o‘zaro bahslashadi.</div>`;
 
@@ -122,7 +141,8 @@ form.addEventListener("submit", async e => {
   input.value = "";
   setBusy(true);
   try {
-    const r = await fetch("/api/message", {
+    const endpoint = appMode === "agent" ? "/api/agent/message" : "/api/message";
+    const r = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
@@ -444,6 +464,7 @@ async function sendVoiceToAI(blob, ext) {
   }
 }
 
+setAppMode("agent");
 loadConfig();
 refresh();
 setInterval(refresh, 1800);
