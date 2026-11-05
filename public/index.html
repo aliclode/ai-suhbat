@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#10131d">
-  <title>AI Suhbat — Gemini & Groq</title>
+  <title>AI Suhbat — Gemini, Groq & Qwen</title>
   <link rel="stylesheet" href="/style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -12,9 +12,9 @@
   <main class="app">
     <header class="top">
       <div>
-        <div class="eyebrow">IKKITA MUSTAQIL AI</div>
+        <div class="eyebrow">UCHTA MUSTAQIL AI</div>
         <h1>AI Suhbat</h1>
-        <p>Gemini va Groq erkin fikr almashadi. Siz ham suhbatga qo‘shiling.</p>
+        <p>Gemini, Groq va Qwen erkin fikr almashadi. Siz ham suhbatga qo‘shiling.</p>
       </div>
       <span id="status" class="status">Ulanmoqda…</span>
     </header>
@@ -27,6 +27,10 @@
       <div class="agent groq">
         <b>◉ Groq</b>
         <small>Groq AI · Tezkor Suhbatdosh</small>
+      </div>
+      <div class="agent qwen">
+        <b>✧ Qwen</b>
+        <small>Qwen AI · Mustaqil tahlilchi</small>
       </div>
     </section>
 
@@ -42,6 +46,8 @@
       <button id="open-gemini-voice" class="secondary gemini-voice-btn" type="button">🎙 Gemini Ovozli</button>
       <button id="open-groq-voice" class="secondary voice-open-btn" type="button">🎙 Groq Ovozli</button>
       <button id="clear" class="secondary clear-btn" type="button" title="Suhbatni tozalash" disabled>✕ Tozalash</button>
+      <button id="export-chat" class="secondary" type="button" disabled>⬇ Eksport</button>
+      <button id="copy-chat" class="secondary" type="button" disabled>⧉ Nusxa olish</button>
       <span id="hint">Avval mavzu yozing</span>
     </div>
 
@@ -51,7 +57,7 @@
     </form>
 
     <footer>
-      <span>Gemini · Groq</span>
+      <span>Gemini · Groq · Qwen</span>
       <span>Erkin suhbat xonasi</span>
     </footer>
   </main>

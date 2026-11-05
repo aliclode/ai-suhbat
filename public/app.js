@@ -42,7 +42,7 @@ function esc(s) {
 function cssName(m) {
   if (m.role === "human" || m.role === "user") return "human";
   if (m.role === "system") return "system";
-  const map = { Gemini: "gemini", Groq: "groq" };
+  const map = { Gemini: "gemini", Groq: "groq", Qwen: "qwen" };
   return map[m.name] || "system";
 }
 
@@ -79,6 +79,8 @@ function updateButtons(messages) {
   const hasHuman = messages.some(m => m.role === "human");
   debate.disabled = busy || !hasHuman;
   clearBtn.disabled = busy || !messages.length;
+  document.getElementById("export-chat").disabled = !messages.length;
+  document.getElementById("copy-chat").disabled = !messages.length;
 }
 
 function setBusy(v) {
@@ -94,9 +96,9 @@ async function loadConfig() {
     const c = await fetch("/api/config");
     const cfg = await c.json();
     const ready = cfg.ready || {};
-    const count = Object.values(ready).filter(Boolean).length;
-    statusEl.textContent = `AI faol: ${count}/2`;
-    statusEl.title = `Gemini: ${ready.gemini ? "tayyor" : "kalit yo‘q"} · Groq: ${ready.groq ? "tayyor" : "kalit yo‘q"}`;
+    const count = [ready.gemini, ready.groq, ready.qwen].filter(Boolean).length;
+    statusEl.textContent = `AI faol: ${count}/3`;
+    statusEl.title = `Gemini: ${ready.gemini ? "tayyor" : "kalit yo‘q"} · Groq: ${ready.groq ? "tayyor" : "kalit yo‘q"} · Qwen: ${ready.qwen ? "Groq orqali tekshiriladi" : "Groq kaliti yo‘q"}`;
   } catch (e) {
     statusEl.textContent = "Aloqa yo‘q";
   }
@@ -157,6 +159,62 @@ clearBtn.addEventListener("click", async () => {
     await refresh();
   } catch (err) {
     alert("Tozalashda xatolik.");
+  }
+});
+
+// Suhbatni matn faylga eksport qilish va nusxa olish.
+function formatTranscript(messages) {
+  return messages.map(m => {
+    const time = new Date(m.time).toLocaleString("uz-UZ");
+    return `[${time}] ${m.name}:\n${m.content}`;
+  }).join("\n\n");
+}
+
+async function getTranscript() {
+  const response = await fetch("/api/messages");
+  if (!response.ok) throw new Error("Suhbatni yuklab bo'lmadi.");
+  const data = await response.json();
+  if (!data.messages || !data.messages.length) throw new Error("Eksport qilish uchun suhbat yo'q.");
+  return formatTranscript(data.messages);
+}
+
+document.getElementById("export-chat").addEventListener("click", async () => {
+  try {
+    const transcript = await getTranscript();
+    const blob = new Blob(["\uFEFF", transcript], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ai-suhbat-${new Date().toISOString().slice(0,10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    hint.textContent = "Suhbat faylga tayyorlandi";
+  } catch (error) {
+    alert(error.message || "Eksportda xatolik.");
+  }
+});
+
+document.getElementById("copy-chat").addEventListener("click", async () => {
+  try {
+    const transcript = await getTranscript();
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(transcript);
+    } else {
+      const area = document.createElement("textarea");
+      area.value = transcript;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const copied = document.execCommand("copy");
+      area.remove();
+      if (!copied) throw new Error("Nusxa olish imkoni bo'lmadi.");
+    }
+    hint.textContent = "Suhbat nusxalandi";
+  } catch (error) {
+    alert(error.message || "Nusxa olishda xatolik.");
   }
 });
 

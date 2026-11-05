@@ -3,12 +3,62 @@ const path = require("path");
 const multer = require("multer");
 const app = express();
 
+// Render ortidagi haqiqiy mijoz IP manzilini olish.
+app.set("trust proxy", 1);
+
+// API spamini va tasodifiy ortiqcha so'rovlarni cheklash.
+function createRateLimiter({ windowMs, max, message }) {
+  const clients = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || "unknown";
+    let entry = clients.get(key);
+    if (!entry || now - entry.startedAt >= windowMs) {
+      entry = { startedAt: now, count: 0 };
+      clients.set(key, entry);
+    }
+    entry.count += 1;
+    if (clients.size > 5000) {
+      for (const [ip, value] of clients) {
+        if (now - value.startedAt >= windowMs) clients.delete(ip);
+      }
+    }
+    res.setHeader("RateLimit-Limit", String(max));
+    res.setHeader("RateLimit-Remaining", String(Math.max(0, max - entry.count)));
+    if (entry.count > max) {
+      const retryAfter = Math.max(1, Math.ceil((entry.startedAt + windowMs - now) / 1000));
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ error: message, retryAfter });
+    }
+    next();
+  };
+}
+
+const apiRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: "Juda ko'p so'rov yuborildi. Bir daqiqadan keyin urinib ko'ring."
+});
+const voiceRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 12,
+  message: "Ovozli so'rovlar limiti tugadi. Biroz kutib qayta urinib ko'ring."
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "32kb" }));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  next();
+});
+app.use("/api", apiRateLimit);
+app.use("/api/voice/talk", voiceRateLimit);
 app.use(express.static(path.join(__dirname, "public")));
 
 let messages = [];
@@ -116,6 +166,37 @@ async function askGemini() {
   throw new Error(`Gemini API xatosi: ${lastError.slice(0, 140)}`);
 }
 
+async function askQwen() {
+  if (!GROQ_KEY) throw new Error("Qwen uchun Groq API kaliti kerak.");
+  const available = await getAvailableGroqModels();
+  const model = available.find(id => /qwen/i.test(id));
+  if (!model) throw new Error("Groq hisobida hozircha Qwen modeli mavjud emas.");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "Sen Qwen nomli mustaqil AI suhbatdoshsan. Faqat o'zbek tilida fikr bildir. Gemini va Groq fikrlarini tanqidiy tahlil qil, kerak bo'lsa ularga qo'shilma. Javobing 2-4 gap, aniq va tugallangan bo'lsin."
+        },
+        { role: "user", content: buildPrompt("Qwen", "Gemini va Groq") }
+      ],
+      temperature: 0.75,
+      max_tokens: 800
+    })
+  });
+  if (!res.ok) throw new Error(`Qwen API xatosi: ${(await res.text()).slice(0, 140)}`);
+  const data = await res.json();
+  const reply = cleanReply(data?.choices?.[0]?.message?.content);
+  if (!reply) throw new Error("Qwen bo'sh javob qaytardi.");
+  return reply;
+}
+
 async function askGroq() {
   let lastError = "";
   const modelsToTry = await getAvailableGroqModels();
@@ -188,6 +269,15 @@ async function runConversationRound() {
         messages.push({ role: "ai", name: "Groq", content: groqReply, time: Date.now() });
       } catch (err) {
         messages.push({ role: "system", name: "Tizim", content: err.message, time: Date.now() });
+      }
+    }
+
+    if (GROQ_KEY) {
+      try {
+        const qwenReply = await askQwen();
+        messages.push({ role: "ai", name: "Qwen", content: qwenReply, time: Date.now() });
+      } catch (err) {
+        messages.push({ role: "system", name: "Qwen", content: err.message, time: Date.now() });
       }
     }
 
@@ -404,13 +494,23 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
   throw new Error("Ovoz sintez qilishda xatolik yuz berdi.");
 }
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "AI Suhbat",
+    uptimeSeconds: Math.floor(process.uptime()),
+    ready: { gemini: Boolean(GEMINI_KEY), groq: Boolean(GROQ_KEY), qwen: Boolean(GROQ_KEY) }
+  });
+});
+
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
 app.get("/api/config", (req, res) => {
   res.json({
     ready: {
       gemini: Boolean(GEMINI_KEY),
-      groq: Boolean(GROQ_KEY)
+      groq: Boolean(GROQ_KEY),
+      qwen: Boolean(GROQ_KEY)
     }
   });
 });
