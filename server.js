@@ -166,6 +166,37 @@ async function askGemini() {
   throw new Error(`Gemini API xatosi: ${lastError.slice(0, 140)}`);
 }
 
+async function askQwen() {
+  if (!GROQ_KEY) throw new Error("Qwen uchun Groq API kaliti kerak.");
+  const available = await getAvailableGroqModels();
+  const model = available.find(id => /qwen/i.test(id));
+  if (!model) throw new Error("Groq hisobida hozircha Qwen modeli mavjud emas.");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "Sen Qwen nomli mustaqil AI suhbatdoshsan. Faqat o'zbek tilida fikr bildir. Gemini va Groq fikrlarini tanqidiy tahlil qil, kerak bo'lsa ularga qo'shilma. Javobing 2-4 gap, aniq va tugallangan bo'lsin."
+        },
+        { role: "user", content: buildPrompt("Qwen", "Gemini va Groq") }
+      ],
+      temperature: 0.75,
+      max_tokens: 800
+    })
+  });
+  if (!res.ok) throw new Error(`Qwen API xatosi: ${(await res.text()).slice(0, 140)}`);
+  const data = await res.json();
+  const reply = cleanReply(data?.choices?.[0]?.message?.content);
+  if (!reply) throw new Error("Qwen bo'sh javob qaytardi.");
+  return reply;
+}
+
 async function askGroq() {
   let lastError = "";
   const modelsToTry = await getAvailableGroqModels();
@@ -238,6 +269,15 @@ async function runConversationRound() {
         messages.push({ role: "ai", name: "Groq", content: groqReply, time: Date.now() });
       } catch (err) {
         messages.push({ role: "system", name: "Tizim", content: err.message, time: Date.now() });
+      }
+    }
+
+    if (GROQ_KEY) {
+      try {
+        const qwenReply = await askQwen();
+        messages.push({ role: "ai", name: "Qwen", content: qwenReply, time: Date.now() });
+      } catch (err) {
+        messages.push({ role: "system", name: "Qwen", content: err.message, time: Date.now() });
       }
     }
 
@@ -459,7 +499,7 @@ app.get("/api/health", (req, res) => {
     ok: true,
     service: "AI Suhbat",
     uptimeSeconds: Math.floor(process.uptime()),
-    ready: { gemini: Boolean(GEMINI_KEY), groq: Boolean(GROQ_KEY) }
+    ready: { gemini: Boolean(GEMINI_KEY), groq: Boolean(GROQ_KEY), qwen: Boolean(GROQ_KEY) }
   });
 });
 
@@ -469,7 +509,8 @@ app.get("/api/config", (req, res) => {
   res.json({
     ready: {
       gemini: Boolean(GEMINI_KEY),
-      groq: Boolean(GROQ_KEY)
+      groq: Boolean(GROQ_KEY),
+      qwen: Boolean(GROQ_KEY)
     }
   });
 });
