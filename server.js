@@ -503,6 +503,95 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+
+// ==========================================================
+// NOVA AI AGENT CORE — rejalashtirish va xavfsiz javob
+// ==========================================================
+async function askNovaAgent(userText) {
+  const recent = messages.slice(-12).map(m => `${m.name}: ${m.content}`).join("\n");
+  const systemPrompt = [
+    "Sen NOVA AI nomli ko'p vazifali shaxsiy AI agentsan.",
+    "Foydalanuvchi bilan o'zbek tilida, sodda va aniq gaplash.",
+    "Har bir topshiriqda avval maqsadni tushun, kerak bo'lsa 2-5 bosqichli qisqa reja tuz, keyin hozir bajara oladigan qismini bajar.",
+    "Agar muhim ma'lumot yetishmasa, faqat eng zarur bitta savolni so'ra.",
+    "Hozircha tashqi internet, GitHub yozish, fayl o'zgartirish, xarid yoki xabar yuborish vositalari ulanmagan. Bunday ishlarni bajardim deb da'vo qilma.",
+    "Tashqi yoki qaytarib bo'lmaydigan amallar uchun doimo foydalanuvchi tasdig'i kerakligini ayt.",
+    "Javobni kerak bo'lsa 'Reja' va 'Natija' sarlavhalari bilan tartibla. Keraksiz uzun yozma."
+  ].join("\n");
+  const prompt = `${systemPrompt}\n\nSo'nggi suhbat:\n${recent || "Hozircha yo'q"}\n\nFoydalanuvchining yangi topshirig'i: ${userText}\n\nNOVA AI javobi:`;
+
+  if (GEMINI_KEY) {
+    let lastError = "";
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.45, maxOutputTokens: 1200 }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const answer = cleanReply((data?.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join(""));
+          if (answer) return answer;
+        } else lastError = await res.text();
+      } catch (err) { lastError = err.message; }
+    }
+    if (!GROQ_KEY) throw new Error(`NOVA AI Gemini xatosi: ${lastError.slice(0, 120)}`);
+  }
+
+  if (GROQ_KEY) {
+    const models = await getAvailableGroqModels();
+    let lastError = "";
+    for (const model of models.slice(0, 3)) {
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
+            temperature: 0.45,
+            max_tokens: 1200
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const answer = cleanReply(data?.choices?.[0]?.message?.content);
+          if (answer) return answer;
+        } else lastError = await res.text();
+      } catch (err) { lastError = err.message; }
+    }
+    throw new Error(`NOVA AI Groq xatosi: ${lastError.slice(0, 120)}`);
+  }
+
+  throw new Error("NOVA AI ishlashi uchun Render'da GEMINI_API_KEY yoki GROQ_API_KEY sozlangan bo'lishi kerak.");
+}
+
+app.post("/api/agent/message", async (req, res) => {
+  const text = String(req.body?.text || "").trim().slice(0, 2500);
+  if (!text) return res.status(400).json({ error: "Topshiriq matni bo'sh." });
+  if (busy) return res.status(429).json({ error: "AI hozir band. Biroz kuting." });
+
+  busy = true;
+  const userMessage = { role: "human", name: "Siz", content: text, time: Date.now() };
+  messages.push(userMessage);
+  try {
+    const answer = await askNovaAgent(text);
+    messages.push({ role: "ai", name: "NOVA AI", content: answer, time: Date.now() });
+    if (messages.length > 100) messages = messages.slice(-100);
+    res.json({ ok: true });
+  } catch (err) {
+    messages.push({ role: "system", name: "NOVA AI", content: err.message || "Agent xatosi.", time: Date.now() });
+    res.status(502).json({ error: err.message || "NOVA AI javob bera olmadi." });
+  } finally {
+    busy = false;
+  }
+});
+
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
 app.get("/api/config", (req, res) => {
