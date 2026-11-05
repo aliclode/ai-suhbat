@@ -371,3 +371,16 @@ footer {
 .mode-switch .secondary { flex: 1; }
 .mode-switch .mode-active { background: linear-gradient(135deg, #263e70, #43346e); border-color: #91a8ff; color: #fff; }
 [hidden] { display: none !important; }
+
+/* NOVA memory panel */
+.memory-panel { margin:14px 0; padding:14px; border:1px solid rgba(145,168,255,.22); border-radius:16px; background:rgba(25,35,62,.55); }
+.memory-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.memory-heading strong { color:#dce6ff; }
+.memory-heading button { font-size:12px; padding:7px 10px; }
+.memory-help { margin:8px 0 10px; color:#9aa6c2; font-size:12px; line-height:1.45; }
+.memory-form { display:flex; gap:8px; }
+.memory-form input { flex:1; min-width:0; padding:11px 12px; border-radius:10px; border:1px solid rgba(145,168,255,.2); background:#0b1020; color:#fff; }
+.memory-form button { padding:10px 14px; border:0; border-radius:10px; color:#fff; background:#4c5fbd; }
+.memory-list { margin:10px 0 0; padding-left:18px; color:#d7def2; font-size:13px; }
+.memory-list li { margin:5px 0; overflow-wrap:anywhere; }
+.memory-list .memory-empty { list-style:none; margin-left:-18px; color:#8e9ab7; }
