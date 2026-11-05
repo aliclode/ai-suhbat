@@ -347,3 +347,20 @@ footer {
     padding: 14px;
   }
 }
+
+.agent.qwen {
+  border-color: #3f927d;
+  background: linear-gradient(135deg, #182a2a, #1b2330);
+}
+.msg.qwen {
+  border-left-color: #55c5a5;
+  background: #1b302e;
+}
+.msg.qwen .name {
+  color: #79dfbd;
+}
+@media (max-width: 420px) {
+  .agents {
+    grid-template-columns: 1fr;
+  }
+}
