@@ -3,12 +3,62 @@ const path = require("path");
 const multer = require("multer");
 const app = express();
 
+// Render ortidagi haqiqiy mijoz IP manzilini olish.
+app.set("trust proxy", 1);
+
+// API spamini va tasodifiy ortiqcha so'rovlarni cheklash.
+function createRateLimiter({ windowMs, max, message }) {
+  const clients = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || "unknown";
+    let entry = clients.get(key);
+    if (!entry || now - entry.startedAt >= windowMs) {
+      entry = { startedAt: now, count: 0 };
+      clients.set(key, entry);
+    }
+    entry.count += 1;
+    if (clients.size > 5000) {
+      for (const [ip, value] of clients) {
+        if (now - value.startedAt >= windowMs) clients.delete(ip);
+      }
+    }
+    res.setHeader("RateLimit-Limit", String(max));
+    res.setHeader("RateLimit-Remaining", String(Math.max(0, max - entry.count)));
+    if (entry.count > max) {
+      const retryAfter = Math.max(1, Math.ceil((entry.startedAt + windowMs - now) / 1000));
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ error: message, retryAfter });
+    }
+    next();
+  };
+}
+
+const apiRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: "Juda ko'p so'rov yuborildi. Bir daqiqadan keyin urinib ko'ring."
+});
+const voiceRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 12,
+  message: "Ovozli so'rovlar limiti tugadi. Biroz kutib qayta urinib ko'ring."
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "32kb" }));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  next();
+});
+app.use("/api", apiRateLimit);
+app.use("/api/voice/talk", voiceRateLimit);
 app.use(express.static(path.join(__dirname, "public")));
 
 let messages = [];
@@ -403,6 +453,15 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
 
   throw new Error("Ovoz sintez qilishda xatolik yuz berdi.");
 }
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "AI Suhbat",
+    uptimeSeconds: Math.floor(process.uptime()),
+    ready: { gemini: Boolean(GEMINI_KEY), groq: Boolean(GROQ_KEY) }
+  });
+});
 
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
 
