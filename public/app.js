@@ -181,7 +181,7 @@ async function getTranscript() {
 document.getElementById("export-chat").addEventListener("click", async () => {
   try {
     const transcript = await getTranscript();
-    const blob = new Blob(["\\uFEFF", transcript], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob(["\uFEFF", transcript], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
