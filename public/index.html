@@ -17,12 +17,14 @@
   <main class="app">
     <header class="top">
       <div>
-        <div class="eyebrow">UCHTA MUSTAQIL AI</div>
-        <h1>AI Suhbat</h1>
-        <p>Gemini, Groq va Qwen erkin fikr almashadi. Siz ham suhbatga qo‘shiling.</p>
+        <div class="eyebrow">NOVA AI · MULTI-AGENT PLATFORM</div>
+        <h1>NOVA AI</h1>
+        <p>Shaxsiy AI agentingiz: suhbat, reja va ovoz bir joyda.</p>
       </div>
       <span id="status" class="status">Ulanmoqda…</span>
     </header>
+
+    <div class="actions mode-switch"><button id="mode-chat" class="secondary" type="button">AI Suhbat</button><button id="mode-agent" class="secondary" type="button">✦ NOVA Agent</button></div>
 
     <section class="agents" id="agents">
       <div class="agent gemini">
@@ -57,7 +59,7 @@
     </div>
 
     <form id="form" class="composer">
-      <textarea id="message" rows="1" maxlength="2500" placeholder="Suhbatga xabar yoki mavzu yozing…" required></textarea>
+      <textarea id="message" rows="1" maxlength="2500" placeholder="NOVA AI ga topshiriq bering yoki savol yozing…" required></textarea>
       <button id="send" type="submit" aria-label="Yuborish">➤</button>
     </form>
 
