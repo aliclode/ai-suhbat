@@ -364,3 +364,10 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* NOVA AI mode switch */
+.mode-switch { margin-top: 14px; }
+.mode-switch .secondary { flex: 1; }
+.mode-switch .mode-active { background: linear-gradient(135deg, #263e70, #43346e); border-color: #91a8ff; color: #fff; }
+[hidden] { display: none !important; }
