@@ -42,7 +42,7 @@ function esc(s) {
 function cssName(m) {
   if (m.role === "human" || m.role === "user") return "human";
   if (m.role === "system") return "system";
-  const map = { Gemini: "gemini", Groq: "groq" };
+  const map = { Gemini: "gemini", Groq: "groq", Qwen: "qwen" };
   return map[m.name] || "system";
 }
 
@@ -96,9 +96,9 @@ async function loadConfig() {
     const c = await fetch("/api/config");
     const cfg = await c.json();
     const ready = cfg.ready || {};
-    const count = Object.values(ready).filter(Boolean).length;
-    statusEl.textContent = `AI faol: ${count}/2`;
-    statusEl.title = `Gemini: ${ready.gemini ? "tayyor" : "kalit yo‘q"} · Groq: ${ready.groq ? "tayyor" : "kalit yo‘q"}`;
+    const count = [ready.gemini, ready.groq, ready.qwen].filter(Boolean).length;
+    statusEl.textContent = `AI faol: ${count}/3`;
+    statusEl.title = `Gemini: ${ready.gemini ? "tayyor" : "kalit yo‘q"} · Groq: ${ready.groq ? "tayyor" : "kalit yo‘q"} · Qwen: ${ready.qwen ? "Groq orqali tekshiriladi" : "Groq kaliti yo‘q"}`;
   } catch (e) {
     statusEl.textContent = "Aloqa yo‘q";
   }
