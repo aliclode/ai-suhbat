@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const multer = require("multer");
 const app = express();
 
@@ -67,6 +68,30 @@ let voiceHistories = {
   gemini: []
 };
 let busy = false;
+let memoryNotes = [];
+const MEMORY_FILE = process.env.NOVA_MEMORY_FILE || path.join(__dirname, "data", "nova-memory.json");
+let saveQueue = Promise.resolve();
+async function persistState() {
+  const snapshot = JSON.stringify({ messages, voiceHistories, memoryNotes });
+  saveQueue = saveQueue.then(async () => {
+    await fs.promises.mkdir(path.dirname(MEMORY_FILE), { recursive: true });
+    await fs.promises.writeFile(MEMORY_FILE + ".tmp", snapshot, "utf8");
+    await fs.promises.rename(MEMORY_FILE + ".tmp", MEMORY_FILE);
+  }).catch(err => console.error("NOVA xotira saqlash xatosi:", err.message));
+  return saveQueue;
+}
+async function loadState() {
+  try {
+    const data = JSON.parse(await fs.promises.readFile(MEMORY_FILE, "utf8"));
+    if (Array.isArray(data.messages)) messages = data.messages.slice(-100);
+    if (Array.isArray(data.memoryNotes)) memoryNotes = data.memoryNotes.slice(-100);
+    if (data.voiceHistories) {
+      voiceHistories.groq = Array.isArray(data.voiceHistories.groq) ? data.voiceHistories.groq.slice(-60) : [];
+      voiceHistories.gemini = Array.isArray(data.voiceHistories.gemini) ? data.voiceHistories.gemini.slice(-60) : [];
+    }
+    console.log("NOVA xotirasi yuklandi.");
+  } catch (err) { if (err.code !== "ENOENT") console.error("Xotira yuklanmadi:", err.message); }
+}
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const GROQ_KEY = process.env.GROQ_API_KEY || "";
@@ -593,6 +618,20 @@ app.post("/api/agent/message", async (req, res) => {
 });
 
 app.get("/api/messages", (req, res) => res.json({ messages, busy }));
+app.get("/api/memory", (req, res) => res.json({ notes: memoryNotes }));
+app.post("/api/memory", async (req, res) => {
+  const noteText = String(req.body?.text || "").trim().slice(0, 500);
+  if (!noteText) return res.status(400).json({ error: "Xotira matni bo'sh." });
+  if (memoryNotes.length >= 100) return res.status(400).json({ error: "Xotira limiti 100 ta." });
+  memoryNotes.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2, 8), text: noteText, createdAt: Date.now() });
+  await persistState();
+  res.json({ ok: true });
+});
+app.delete("/api/memory", async (req, res) => {
+  memoryNotes = [];
+  await persistState();
+  res.json({ ok: true });
+});
 
 app.get("/api/config", (req, res) => {
   res.json({
@@ -694,4 +733,4 @@ app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`AI Suhbat serveri ${PORT}-portda ishga tushdi`));
+loadState().finally(() => app.listen(PORT, () => console.log(`NOVA AI serveri ${PORT}-portda ishga tushdi`)));
