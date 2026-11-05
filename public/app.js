@@ -22,6 +22,9 @@ const debate = document.getElementById("debate");
 const clearBtn = document.getElementById("clear");
 const statusEl = document.getElementById("status");
 const hint = document.getElementById("hint");
+const memoryForm = document.getElementById("memory-form");
+const memoryInput = document.getElementById("memory-input");
+const memoryList = document.getElementById("memory-list");
 
 let lastSignature = "";
 let hasMessages = false;
@@ -465,6 +468,46 @@ async function sendVoiceToAI(blob, ext) {
 }
 
 setAppMode("agent");
+async function loadMemory() {
+  try {
+    const response = await fetch("/api/memory");
+    const data = await response.json();
+    const notes = data.notes || [];
+    memoryList.innerHTML = notes.length
+      ? notes.map(note => "<li>" + esc(note.text) + "</li>").join("")
+      : "<li class='memory-empty'>Hozircha xotira bo‘sh.</li>";
+  } catch (err) {
+    memoryList.innerHTML = "<li class='memory-empty'>Xotira yuklanmadi.</li>";
+  }
+}
+
+memoryForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const text = memoryInput.value.trim();
+  if (!text) return;
+  try {
+    const response = await fetch("/api/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Xotira saqlanmadi.");
+    memoryInput.value = "";
+    await loadMemory();
+  } catch (err) { alert(err.message); }
+});
+
+document.getElementById("memory-clear").addEventListener("click", async () => {
+  if (!confirm("Barcha saqlangan eslatmalar o‘chirilsinmi?")) return;
+  try {
+    const response = await fetch("/api/memory", { method: "DELETE" });
+    if (!response.ok) throw new Error("Xotira tozalanmadi.");
+    await loadMemory();
+  } catch (err) { alert(err.message); }
+});
+
+loadMemory();
 loadConfig();
 refresh();
 setInterval(refresh, 1800);
