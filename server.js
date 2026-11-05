@@ -543,7 +543,8 @@ async function askNovaAgent(userText) {
     "Tashqi yoki qaytarib bo'lmaydigan amallar uchun doimo foydalanuvchi tasdig'i kerakligini ayt.",
     "Javobni kerak bo'lsa 'Reja' va 'Natija' sarlavhalari bilan tartibla. Keraksiz uzun yozma."
   ].join("\n");
-  const prompt = `${systemPrompt}\n\nSo'nggi suhbat:\n${recent || "Hozircha yo'q"}\n\nFoydalanuvchining yangi topshirig'i: ${userText}\n\nNOVA AI javobi:`;
+  const savedMemory = memoryNotes.map(note => note.text).join(" | ");
+  const prompt = `${systemPrompt}\n\nSaqlangan xotira: ${savedMemory || "Hozircha mavjud emas."}\n\nSo'nggi suhbat:\n${recent || "Hozircha yo'q"}\n\nFoydalanuvchining yangi topshirig'i: ${userText}\n\nNOVA AI javobi:`;
 
   if (GEMINI_KEY) {
     let lastError = "";
