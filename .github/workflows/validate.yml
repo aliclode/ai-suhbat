@@ -1,0 +1,22 @@
+name: Validate AI Suhbat
+
+on:
+  push:
+    branches: [main, "upgrade/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          node --check public/app.js
+      - name: Validate package.json
+        run: node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
