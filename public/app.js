@@ -262,6 +262,39 @@ const micBtn = document.getElementById("mic-btn");
 const voiceStatus = document.getElementById("voice-status");
 const voiceClearBtn = document.getElementById("voice-clear");
 const voiceGenderSelect = document.getElementById("voice-gender");
+const voiceProfileSelect = document.getElementById("voice-profile");
+const voiceSpeedInput = document.getElementById("voice-speed");
+const voiceSpeedValue = document.getElementById("voice-speed-value");
+const voiceInstructionsInput = document.getElementById("voice-instructions");
+
+voiceSpeedInput.addEventListener("input", () => {
+  voiceSpeedValue.textContent = Number(voiceSpeedInput.value).toFixed(2).replace(/0$/, "") + "×";
+});
+
+async function loadVoiceStudioProfiles() {
+  try {
+    const response = await fetch("/api/voice/studio/voices");
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.configured || !Array.isArray(data.voices)) return;
+    const current = voiceProfileSelect.value;
+    voiceProfileSelect.innerHTML = '<option value="">Standart ovoz</option>';
+    data.voices.forEach(voice => {
+      const id = String(voice.voice_id || voice.id || "").trim();
+      const name = String(voice.name || id).trim();
+      if (!id) return;
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = name;
+      voiceProfileSelect.appendChild(option);
+    });
+    if ([...voiceProfileSelect.options].some(option => option.value === current)) {
+      voiceProfileSelect.value = current;
+    }
+  } catch (err) {
+    console.warn("VoiceStudio ovoz profillari yuklanmadi:", err.message);
+  }
+}
 
 let activeVoiceTarget = "groq"; // "groq" yoki "gemini"
 let voiceList = [];
@@ -315,6 +348,7 @@ function openVoiceModal(target) {
   voiceStatus.textContent = "Gapirish uchun mikrofonni bosing";
   voiceModal.hidden = false;
   loadVoiceHistory();
+  loadVoiceStudioProfiles();
 }
 
 openGeminiVoiceBtn.addEventListener("click", () => openVoiceModal("gemini"));
@@ -421,6 +455,9 @@ async function sendVoiceToAI(blob, ext) {
     const formData = new FormData();
     formData.append("audio", blob, `voice.${ext}`);
     formData.append("voice", voiceGenderSelect.value);
+    formData.append("voiceProfile", voiceProfileSelect.value);
+    formData.append("voiceSpeed", voiceSpeedInput.value);
+    formData.append("voiceInstructions", voiceInstructionsInput.value);
     formData.append("target", activeVoiceTarget);
 
     const res = await fetch("/api/voice/talk", {

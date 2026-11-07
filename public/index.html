@@ -95,6 +95,20 @@
             <option value="female">Madina (Ayol · Neural)</option>
           </select>
         </label>
+        <label class="voice-select-label">
+          VoiceStudio ovozi:
+          <select id="voice-profile" class="voice-select">
+            <option value="">Standart ovoz</option>
+          </select>
+        </label>
+        <label class="voice-select-label">
+          Tezlik: <span id="voice-speed-value">1.0×</span>
+          <input id="voice-speed" type="range" min="0.75" max="1.25" step="0.05" value="1">
+        </label>
+        <label class="voice-select-label">
+          Ovoz uslubi:
+          <input id="voice-instructions" class="voice-select" type="text" maxlength="300" placeholder="Masalan: sokin, ravon va tabiiy">
+        </label>
         <button id="voice-clear" class="secondary clear-btn" type="button">Tozalash</button>
       </div>
 
