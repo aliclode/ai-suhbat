@@ -97,6 +97,62 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const GROQ_KEY = process.env.GROQ_API_KEY || "";
 const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY || "";
 
+// Optional VoiceStudio speech backend. Set VOICESTUDIO_URL to its service root.
+const VOICESTUDIO_URL = (process.env.VOICESTUDIO_URL || "").trim().replace(/\/+$/, "").replace(/\/v1$/, "");
+const VOICESTUDIO_API_KEY = process.env.VOICESTUDIO_API_KEY || "";
+const VOICESTUDIO_STT_MODEL = process.env.VOICESTUDIO_STT_MODEL || "whisper-1";
+const VOICESTUDIO_TTS_MODEL = process.env.VOICESTUDIO_TTS_MODEL || "tts-1";
+
+function voiceStudioHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (VOICESTUDIO_API_KEY) headers.Authorization = `Bearer ${VOICESTUDIO_API_KEY}`;
+  return headers;
+}
+
+async function transcribeWithVoiceStudio(buffer, mimetype, originalname) {
+  const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
+  const ext = (originalname && originalname.includes("."))
+    ? originalname.split(".").pop()
+    : (cleanMime.includes("mp4") ? "m4a" : "webm");
+  const form = new FormData();
+  form.append("file", new Blob([buffer], { type: cleanMime }), `voice.${ext}`);
+  form.append("model", VOICESTUDIO_STT_MODEL);
+  form.append("language", "uz");
+  form.append("response_format", "json");
+
+  const response = await fetch(`${VOICESTUDIO_URL}/v1/audio/transcriptions`, {
+    method: "POST",
+    headers: voiceStudioHeaders(),
+    body: form
+  });
+  if (!response.ok) throw new Error(`VoiceStudio STT xatosi (${response.status}): ${(await response.text()).slice(0, 180)}`);
+  const data = await response.json();
+  const transcript = String(data.text || "").trim();
+  if (!transcript) throw new Error("VoiceStudio bo'sh transkripsiya qaytardi.");
+  return transcript;
+}
+
+async function synthesizeWithVoiceStudio(text, voiceProfile, speed, instructions) {
+  const payload = {
+    model: VOICESTUDIO_TTS_MODEL,
+    input: text,
+    voice: voiceProfile || "alloy",
+    response_format: "mp3",
+    speed: Math.min(4, Math.max(0.25, Number(speed) || 1))
+  };
+  if (instructions) payload.instructions = String(instructions).slice(0, 300);
+
+  const response = await fetch(`${VOICESTUDIO_URL}/v1/audio/speech`, {
+    method: "POST",
+    headers: voiceStudioHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error(`VoiceStudio TTS xatosi (${response.status}): ${(await response.text()).slice(0, 180)}`);
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (audio.length < 100) throw new Error("VoiceStudio audio fayli bo'sh.");
+  return audio;
+}
+
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
   "gemini-flash-latest",
@@ -319,6 +375,14 @@ async function runConversationRound() {
 // ==========================================================
 
 async function transcribeUzbekVoice(buffer, mimetype, originalname) {
+  if (VOICESTUDIO_URL) {
+    try {
+      return await transcribeWithVoiceStudio(buffer, mimetype, originalname);
+    } catch (err) {
+      console.warn("VoiceStudio STT ishlamadi, zaxira STT sinab ko'riladi:", err.message);
+    }
+  }
+
   const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
 
   if (GEMINI_KEY) {
@@ -478,7 +542,14 @@ async function askGeminiVoiceOnly(userText) {
   throw new Error(`Gemini javob xatosi: ${lastError.slice(0, 120)}`);
 }
 
-async function synthesizeSpeechServer(text, voiceGender = "male") {
+async function synthesizeSpeechServer(text, voiceGender = "male", voiceProfile = "", voiceSpeed = 1, voiceInstructions = "") {
+  if (VOICESTUDIO_URL) {
+    try {
+      return await synthesizeWithVoiceStudio(text, voiceProfile, voiceSpeed, voiceInstructions);
+    } catch (err) {
+      console.warn("VoiceStudio TTS ishlamadi, zaxira TTS sinab ko'riladi:", err.message);
+    }
+  }
   if (ELEVENLABS_KEY) {
     try {
       const voiceId = "21m00Tcm4TlvDq8ikWAM";
@@ -518,6 +589,19 @@ async function synthesizeSpeechServer(text, voiceGender = "male") {
 
   throw new Error("Ovoz sintez qilishda xatolik yuz berdi.");
 }
+
+app.get("/api/voice/studio/voices", async (req, res) => {
+  if (!VOICESTUDIO_URL) return res.status(503).json({ ok: false, configured: false, voices: [] });
+  try {
+    const response = await fetch(`${VOICESTUDIO_URL}/v1/audio/voices`, { headers: voiceStudioHeaders() });
+    if (!response.ok) return res.status(502).json({ ok: false, configured: true, voices: [], error: "VoiceStudio ovozlar ro'yxatini bera olmadi." });
+    const data = await response.json();
+    const voices = Array.isArray(data) ? data : (data.voices || data.data || []);
+    res.json({ ok: true, configured: true, voices });
+  } catch (err) {
+    res.status(502).json({ ok: false, configured: true, voices: [], error: "VoiceStudio serveriga ulanib bo'lmadi." });
+  }
+});
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -721,7 +805,10 @@ app.post("/api/voice/talk", upload.single("audio"), async (req, res) => {
       voiceHistories[target] = voiceHistories[target].slice(-60);
     }
 
-    const audioBuffer = await synthesizeSpeechServer(replyText, voiceGender);
+    const voiceProfile = String(req.body?.voiceProfile || "").trim().slice(0, 160);
+    const voiceSpeed = Number(req.body?.voiceSpeed || 1);
+    const voiceInstructions = String(req.body?.voiceInstructions || "").trim().slice(0, 300);
+    const audioBuffer = await synthesizeSpeechServer(replyText, voiceGender, voiceProfile, voiceSpeed, voiceInstructions);
 
     res.json({
       userMessage: userMsg,
